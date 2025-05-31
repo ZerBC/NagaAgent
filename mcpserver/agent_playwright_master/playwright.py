@@ -250,7 +250,9 @@ class PlaywrightAgent(Agent):
     async def handle_handoff(self, data: dict) -> str:
         """智能处理handoff请求：支持url直达、query自动识别网址或搜索并打开第一个结果，并支持按selector输入/点击"""
         try:
-            sys.stderr.write(f'收到handoff请求数据: {json.dumps(data, ensure_ascii=False)}\n')
+            # 修复中文编码问题
+            data_json = json.dumps(data, ensure_ascii=False)
+            sys.stderr.write(f'收到handoff请求数据: {data_json}\n'.encode('utf-8', errors='replace').decode('utf-8'))
             if not isinstance(data, dict):
                 raise ValueError(f"无效的数据格式: {type(data)}")
             url = data.get("url")
@@ -329,7 +331,7 @@ class PlaywrightAgent(Agent):
                 if url2:
                     if not url2.startswith(('http://', 'https://')):
                         url2 = 'https://' + url2
-                    sys.stderr.write(f'query被识别为网址，自动打开: {url2}\n')
+                    sys.stderr.write(f'query被识别为网址，自动打开: {url2}\n'.encode('utf-8', errors='replace').decode('utf-8'))
                     async with LocalPlaywrightComputer() as computer:
                         result = await computer.open_url(url2)
                         response = {
@@ -347,14 +349,14 @@ class PlaywrightAgent(Agent):
                 engine = data.get("engine", "")
                 if not engine:
                     engine = "google" # 默认使用google
-                sys.stderr.write(f'query被视为搜索内容，执行搜索: {query}, engine={engine}\n')
+                sys.stderr.write(f'query被视为搜索内容，执行搜索: {query}, engine={engine}\n'.encode('utf-8', errors='replace').decode('utf-8'))
                 search_result = await search_web(query, engine)
                 # 自动打开第一个结果
                 if search_result.get("status") == "ok" and search_result.get("data", {}).get("results"):
                     first_result = search_result["data"]["results"][0]
                     url3 = first_result.get("url")
                     if url3:
-                        sys.stderr.write(f'自动打开搜索第一个结果: {url3}\n')
+                        sys.stderr.write(f'自动打开搜索第一个结果: {url3}\n'.encode('utf-8', errors='replace').decode('utf-8'))
                         async with LocalPlaywrightComputer() as computer:
                             result = await computer.open_url(url3)
                             if result == 'ok':
@@ -370,7 +372,7 @@ class PlaywrightAgent(Agent):
                 'data': {}
             }, ensure_ascii=False)
         except Exception as e:
-            sys.stderr.write(f'handle_handoff异常: {e}\n')
+            sys.stderr.write(f'handle_handoff异常: {e}\n'.encode('utf-8', errors='replace').decode('utf-8'))
             import traceback;traceback.print_exc(file=sys.stderr)
             return json.dumps({
                 'status': 'error',

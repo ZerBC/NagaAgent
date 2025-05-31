@@ -1,9 +1,57 @@
 ﻿# config.py # 全局配置极简整理
 import os
+import platform
 from pathlib import Path
 from datetime import datetime
 
-NAGA_VERSION = "2.1" #系统主版本号
+# 设置环境变量解决各种兼容性问题
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
+os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+os.environ.setdefault("PYTORCH_MPS_HIGH_WATERMARK_RATIO", "0.0")
+os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+
+# 代理配置处理 - 为本地API连接绕过代理
+ORIGINAL_PROXY = os.environ.get("ALL_PROXY", "")
+NO_PROXY_HOSTS = "127.0.0.1,localhost,0.0.0.0"
+
+# 设置不使用代理的主机列表
+if ORIGINAL_PROXY:
+    existing_no_proxy = os.environ.get("NO_PROXY", "")
+    if existing_no_proxy:
+        os.environ["NO_PROXY"] = f"{existing_no_proxy},{NO_PROXY_HOSTS}"
+    else:
+        os.environ["NO_PROXY"] = NO_PROXY_HOSTS
+
+# 加载.env文件
+def load_env():
+    """加载.env文件中的环境变量"""
+    env_path = Path(__file__).parent / '.env'
+    if env_path.exists():
+        try:
+            with open(env_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        key = key.strip()
+                        value = value.strip()
+                        # 移除引号
+                        if value.startswith('"') and value.endswith('"'):
+                            value = value[1:-1]
+                        elif value.startswith("'") and value.endswith("'"):
+                            value = value[1:-1]
+                        os.environ[key] = value
+        except Exception as e:
+            print(f"警告：加载.env文件失败: {e}")
+
+# 加载环境变量
+load_env()
+
+NAGA_VERSION = "2.3" #系统主版本号
 #流式交互
 VOICE_ENABLED = False # 或True，按你需求
 
@@ -18,9 +66,34 @@ HNSW_M = 48 # HNSW参数
 PQ_M = 16 # PQ分段数
 
 # API与服务配置
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", " ")
+DEEPSEEK_API_KEY = ''
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+
+# 确保API密钥是纯ASCII字符串
+if DEEPSEEK_API_KEY:
+    try:
+        # 验证API密钥只包含ASCII字符
+        DEEPSEEK_API_KEY.encode('ascii')
+    except UnicodeEncodeError:
+        print("错误：API密钥包含非ASCII字符，请检查.env文件")
+        DEEPSEEK_API_KEY = "sk-placeholder-key-not-set"
+
+# 检查API密钥有效性
+if not DEEPSEEK_API_KEY or DEEPSEEK_API_KEY == "sk-placeholder-key-not-set":
+    print("警告：未设置 DEEPSEEK_API_KEY 环境变量或配置文件中的API密钥为空")
+    print("请在 .env 文件中设置: DEEPSEEK_API_KEY=your_api_key")
+    print("或直接修改 config.py 文件中的 DEEPSEEK_API_KEY 值")
+    # 设置一个无害的默认值，避免HTTP头部编码错误
+    if not DEEPSEEK_API_KEY:
+        DEEPSEEK_API_KEY = "sk-placeholder-key-not-set"
+
+# API服务器配置
+API_SERVER_ENABLED = True  # 是否启用API服务器
+API_SERVER_HOST = os.getenv("API_SERVER_HOST", "127.0.0.1")  # API服务器主机
+API_SERVER_PORT = int(os.getenv("API_SERVER_PORT", "8000"))  # API服务器端口
+API_SERVER_AUTO_START = True  # 启动时自动启动API服务器
+API_SERVER_DOCS_ENABLED = True  # 是否启用API文档
 
 # 对话与检索参数
 MAX_HISTORY_ROUNDS = 10 # 最大历史轮数
@@ -92,12 +165,59 @@ def get_current_date(): return datetime.now().strftime("%Y-%m-%d")
 def get_current_time(): return datetime.now().strftime("%H:%M:%S")
 def get_current_datetime(): return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# 浏览器路径自动探测，未找到则报错提示安装
-BROWSER_PATH=os.getenv('BROWSER_PATH')
+# 跨平台浏览器路径自动探测
+BROWSER_PATH = os.getenv('BROWSER_PATH')
 if not BROWSER_PATH:
- for p in [r'C:\Program Files\Google\Chrome\Application\chrome.exe',r'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe',os.path.expanduser(r'~\AppData\Local\Google\Chrome\Application\chrome.exe'),r'C:\Users\DREEM\Desktop\Google Chrome.lnk']:
-  if os.path.exists(p):BROWSER_PATH=p;break
-if not BROWSER_PATH:raise RuntimeError('未检测到谷歌浏览器，请先安装Google Chrome！')
+    system = platform.system()
+    
+    if system == "Windows":
+        # Windows 浏览器路径
+        win_paths = [
+            r'C:\Program Files\Google\Chrome\Application\chrome.exe',
+            r'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe',
+            os.path.expanduser(r'~\AppData\Local\Google\Chrome\Application\chrome.exe'),
+            r'C:\Users\DREEM\Desktop\Google Chrome.lnk'
+        ]
+        for p in win_paths:
+            if os.path.exists(p):
+                BROWSER_PATH = p
+                break
+                
+    elif system == "Darwin":  # macOS
+        # macOS 浏览器路径
+        mac_paths = [
+            '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+            '/Applications/Chromium.app/Contents/MacOS/Chromium',
+            '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+            os.path.expanduser('~/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'),
+        ]
+        for p in mac_paths:
+            if os.path.exists(p):
+                BROWSER_PATH = p
+                break
+                
+    elif system == "Linux":
+        # Linux 浏览器路径
+        linux_paths = [
+            '/usr/bin/google-chrome',
+            '/usr/bin/chromium-browser',
+            '/usr/bin/chromium',
+            '/snap/bin/chromium',
+            '/usr/bin/google-chrome-stable'
+        ]
+        for p in linux_paths:
+            if os.path.exists(p):
+                BROWSER_PATH = p
+                break
+
+if not BROWSER_PATH:
+    system = platform.system()
+    if system == "Windows":
+        raise RuntimeError('未检测到谷歌浏览器，请先安装Google Chrome！')
+    elif system == "Darwin":
+        raise RuntimeError('未检测到浏览器，请先安装Google Chrome或Chromium！\n建议运行: brew install --cask google-chrome')
+    else:
+        raise RuntimeError('未检测到浏览器，请先安装Google Chrome或Chromium！')
 
 PLAYWRIGHT_HEADLESS=False # Playwright浏览器是否无头模式，False弹窗便于调试
 

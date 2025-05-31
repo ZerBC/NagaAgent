@@ -176,7 +176,9 @@ class MCPManager:
     ) -> str:
         """执行handoff"""
         try:
-            sys.stderr.write(f"执行handoff: service={service_name}, task={json.dumps(task, ensure_ascii=False)}\n")
+            # 修复中文编码问题
+            task_json = json.dumps(task, ensure_ascii=False)
+            sys.stderr.write(f"执行handoff: service={service_name}, task={task_json}\n".encode('utf-8', errors='replace').decode('utf-8'))
             
             if service_name not in self.services:
                 raise ValueError(f"未注册的服务: {service_name}")
@@ -189,7 +191,8 @@ class MCPManager:
                 "agent_name": service.get("agent_name", ""),
                 "strict_schema": service.get("strict_schema", False)
             }
-            sys.stderr.write(f"找到服务配置: {json.dumps(safe_service_info, ensure_ascii=False)}\n")
+            safe_info_json = json.dumps(safe_service_info, ensure_ascii=False)
+            sys.stderr.write(f"找到服务配置: {safe_info_json}\n".encode('utf-8', errors='replace').decode('utf-8'))
             
             # 简单验证必需字段
             if service["strict_schema"]:
@@ -203,7 +206,7 @@ class MCPManager:
                 try:
                     task["messages"] = service["filter_fn"](task["messages"])
                 except Exception as e:
-                    sys.stderr.write(f"消息过滤失败: {e}\n")
+                    sys.stderr.write(f"消息过滤失败: {e}\n".encode('utf-8', errors='replace').decode('utf-8'))
                     # 继续执行，使用原始消息
                 
             # 创建代理实例
@@ -212,16 +215,16 @@ class MCPManager:
             agent = MCP_REGISTRY.get(agent_name)
             if not agent:
                 raise ValueError(f"找不到已注册的Agent实例: {agent_name}")
-            sys.stderr.write(f"使用注册中心中的Agent实例: {agent_name}\n")
+            sys.stderr.write(f"使用注册中心中的Agent实例: {agent_name}\n".encode('utf-8', errors='replace').decode('utf-8'))
             # 执行handoff
-            sys.stderr.write("开始执行代理handoff\n")
+            sys.stderr.write("开始执行代理handoff\n".encode('utf-8', errors='replace').decode('utf-8'))
             result = await agent.handle_handoff(task)
-            sys.stderr.write(f"代理handoff执行结果: {result}\n")
+            sys.stderr.write(f"代理handoff执行结果: {result}\n".encode('utf-8', errors='replace').decode('utf-8'))
             return result
             
         except Exception as e:
             error_msg = f"Handoff执行失败: {str(e)}"
-            sys.stderr.write(f"{error_msg}\n")
+            sys.stderr.write(f"{error_msg}\n".encode('utf-8', errors='replace').decode('utf-8'))
             import traceback
             traceback.print_exc(file=sys.stderr)
             return json.dumps({

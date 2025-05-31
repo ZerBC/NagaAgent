@@ -1,37 +1,54 @@
-# NagaAgent 2.2beta 
+# NagaAgent 2.3
 
-> 智能对话助手，支持多MCP服务、流式语音交互、主题树检索、极致精简代码风格。
+> 智能对话助手，支持多MCP服务、流式语音交互、主题树检索、RESTful API接口、极致精简代码风格。
 
 ---
 
 ## ⚡ 快速开始
 1. 克隆项目
-   ```powershell
+   ```bash
    git clone [项目地址]
    cd NagaAgent
    ```
 2. 一键配置
+
+   **Windows:**
    ```powershell
    .\setup.ps1
+   ```
+   **Mac:**
+   ```bash
+   chmod +x quick_deploy_mac.sh
+   ./quick_deploy_mac.sh
    ```
    - 自动创建虚拟环境并安装依赖
    - 检查/下载中文向量模型
    - 配置支持toolcall的LLM，推荐DeepSeekV3
 3. 启动
+
+   **Windows:**
    ```powershell
    .\start.bat
    ```
+   **Mac:**
+   ```bash
+   ./start_mac.sh
+   ```
+
+启动后将自动开启PyQt5界面和RESTful API服务器，可同时使用界面对话和API接口。
 
 ---
 
 ## 🖥️ 系统要求
-- Windows 10/11
-- Python 3.13+
-- PowerShell 5.1+
+- **Windows:** Windows 10/11 + PowerShell 5.1+
+- **Mac:** macOS 10.15 (Catalina) 或更高版本 + Homebrew
+- **通用:** Python 3.8+ (推荐 3.11)
 
 ---
 
 ## 🛠️ 依赖安装与环境配置
+
+### Windows 环境
 - 所有依赖见`requirements.txt`
 - 如遇`greenlet`、`pyaudio`等安装失败，需先装[Microsoft Visual C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)，勾选C++ build tools，重启命令行后再`pip install -r requirements.txt`
 - 浏览器自动化需`playwright`，首次用需`python -m playwright install chromium`
@@ -43,14 +60,64 @@
   python -m playwright install chromium
   ```
 
+### Mac 环境
+- 系统依赖通过Homebrew安装：
+  ```bash
+  # 安装基础依赖
+  brew install python@3.11 portaudio
+  brew install --cask google-chrome
+  ```
+- Python依赖安装：
+  ```bash
+  python3 -m venv .venv
+  source .venv/bin/activate
+  pip install -r requirements.txt
+  python -m playwright install chromium
+  ```
+- 如遇PyAudio安装失败：
+  ```bash
+  brew install portaudio
+  pip install pyaudio
+  ```
+
+### 环境检查（跨平台通用）
+```bash
+python check_env.py
+```
+
+
+## ⚙️ 配置说明
+
+### API 密钥配置
+直接修改 `config.py` 文件中的配置：
+```python
+DEEPSEEK_API_KEY = "<your_deepseek_api>"
+```
+
+### API服务器配置
+在 `config.py` 中可配置API服务器相关参数：
+```python
+API_SERVER_ENABLED = True  # 是否启用API服务器
+API_SERVER_HOST = "127.0.0.1"  # API服务器主机
+API_SERVER_PORT = 8000  # API服务器端口
+API_SERVER_AUTO_START = True  # 启动时自动启动API服务器
+```
+
+### 获取 DeepSeek API 密钥
+1. 访问 [DeepSeek 官网](https://platform.deepseek.com/)
+2. 注册账号并创建 API 密钥
+3. 将密钥填入 `config.py` 或 `.env` 文件
+
 ---
 
 ## 🌟 主要特性
 - **全局变量/路径/密钥统一`config.py`管理**，支持.env和环境变量，所有变量唯一、无重复定义
+- **RESTful API接口**，自动启动HTTP服务器，支持完整对话功能和流式输出，可集成到任何前端或服务
 - DeepSeek流式对话，支持上下文召回与主题树分片检索
 - faiss向量数据库，HNSW+PQ混合索引，异步加速，动态调整深度，权重动态调整，自动清理
 - MCP服务集成，Agent Handoff智能分发，支持自定义过滤器与回调
 - **多Agent能力扩展：浏览器、文件、代码等多种Agent即插即用，所有Agent均可通过handoff机制统一调用**
+- **跨平台兼容：Windows/Mac自动适配，浏览器路径自动检测，依赖智能安装**
 - 代码极简，注释全中文，组件解耦，便于扩展
 - PyQt5动画与UI，支持PNG序列帧，loading动画极快
 - 日志/检索/索引/主题/参数全部自动管理
@@ -67,9 +134,15 @@
 NagaAgent/
 ├── main.py                     # 主入口
 ├── config.py                   # 全局配置
+├── api_server.py               # RESTful API服务器
 ├── conversation_core.py        # 对话核心（含兼容模式主逻辑）
 ├── mcp_manager.py              # MCP服务管理
 ├── requirements.txt            # 依赖
+├── setup.ps1                   # Windows配置脚本
+├── start.bat                   # Windows启动脚本
+├── setup_mac.sh                # Mac配置脚本
+├── quick_deploy_mac.sh         # Mac一键部署脚本
+├── check_env.py                # 跨平台环境检查
 ├── summer/                     # faiss与向量相关
 │   ├── memory_manager.py       # 记忆管理主模块
 │   ├── summer_faiss.py         # faiss相关操作
@@ -141,8 +214,6 @@ await s.mcp.handoff(
 
 ---
 
-如需详细功能/API/扩展说明，见各模块注释与代码，所有变量唯一、注释中文、极致精简。
-
 ## 🆙 历史对话兼容升级
 - 支持将旧版txt对话内容一键导入AI多层记忆系统，兼容主题、分层、embedding等所有新特性。
 - 激活指令：
@@ -163,46 +234,34 @@ await s.mcp.handoff(
 - 兼容内容全部走AI自动主题归类与分层，完全与新系统一致。
 - 详细进度、结果和异常均有反馈，安全高效。
 
-## 📚 目录结构
-```
-NagaAgent/
-├── main.py                     # 主入口
-├── config.py                   # 全局配置
-├── conversation_core.py        # 对话核心（含兼容模式主逻辑）
-├── mcp_manager.py              # MCP服务管理
-├── requirements.txt            # 依赖
-├── summer/                     # faiss与向量相关
-│   ├── memory_manager.py       # 记忆管理主模块
-│   ├── summer_faiss.py         # faiss相关操作
-│   ├── faiss_index.py          # faiss索引管理
-│   ├── embedding.py            # 向量编码
-│   ├── memory_flow/            # 记忆分层相关
-│   └── summer_upgrade/         # 兼容升级相关脚本
-│       └── compat_txt_to_faiss.py # 历史对话兼容主脚本
-├── logs/                       # 日志（含历史txt对话）
-│   ├── 2025-04-27.txt
-│   ├── 2025-05-05.txt
-│   ├── ...
-│   └── faiss/                  # faiss索引与元数据
-├── voice/                      # 语音相关
-│   ├── voice_config.py
-│   └── voice_handler.py
-├── ui/                         # 前端UI
-│   └── pyqt_chat_window.py     # PyQt聊天窗口
-├── models/                     # 向量模型等
-├── README.md                   # 项目说明
-└── ...
-```
+---
 
 ## ❓ 常见问题
+
+- 环境检查：`python check_env.py`
+
+### Windows 环境
 - Python版本/依赖/虚拟环境/浏览器驱动等问题，详见`setup.ps1`与本README
 - IDE报import错误，重启并选择正确解释器
 - 语音依赖安装失败，先装C++ Build Tools
+
+### Mac 环境
+- Python版本过低：`brew install python@3.11`
+- PyAudio安装失败：`brew install portaudio && pip install pyaudio`
+- 权限问题：`chmod +x *.sh`
+
+### API服务器问题
+- 端口占用：修改`config.py`中的`API_SERVER_PORT`
+- 代理干扰：临时禁用代理 `unset ALL_PROXY http_proxy https_proxy`
+- 依赖缺失：确保安装了FastAPI和Uvicorn `pip install fastapi uvicorn[standard]`
+- 无法访问：检查防火墙设置，确保端口未被阻塞
+
+### 通用问题
 - 浏览器无法启动，检查playwright安装与网络
 - 主题树/索引/参数/密钥全部在`config.py`统一管理
-
-## 📝 开发模式
 - 聊天输入`#devmode`进入开发者模式，后续对话不写入faiss，仅用于MCP测试
+
+---
 
 ## 📝 许可证
 MIT License
@@ -259,3 +318,165 @@ MIT License
 ```
 
 如需自定义Agent或扩展plan协议，请参考`mcpserver/agent_xxx/`和`mcp_registry.py`。
+
+---
+
+## 🌐 RESTful API 服务
+
+NagaAgent内置完整的RESTful API服务器，启动时自动开启，支持所有对话功能：
+
+### API接口说明
+
+- **基础地址**: `http://127.0.0.1:8000` (可在config.py中配置)
+- **交互式文档**: `http://127.0.0.1:8000/docs`
+- **OpenAPI规范**: `http://127.0.0.1:8000/openapi.json`
+
+### 主要接口
+
+#### 健康检查
+```bash
+GET /health
+```
+
+#### 对话接口
+```bash
+# 普通对话
+POST /chat
+{
+  "message": "你好，娜迦",
+  "session_id": "optional-session-id"
+}
+
+# 流式对话 (Server-Sent Events)
+POST /chat/stream
+{
+  "message": "请介绍一下人工智能的发展历程"
+}
+```
+
+#### 系统管理接口
+```bash
+# 获取系统信息
+GET /system/info
+
+# 切换开发者模式
+POST /system/devmode
+
+# 获取记忆统计
+GET /memory/stats
+
+# 获取MCP服务列表
+GET /mcp/services
+
+# 调用MCP服务
+POST /mcp/handoff
+{
+  "service_name": "file",
+  "task": {
+    "action": "read",
+    "path": "test.txt"
+  }
+}
+```
+
+### API使用示例
+
+#### curl命令
+```bash
+# 基本对话
+curl -X POST "http://127.0.0.1:8000/chat" \
+     -H "Content-Type: application/json" \
+     -d '{"message": "你好，娜迦"}'
+
+# 流式对话
+curl -X POST "http://127.0.0.1:8000/chat/stream" \
+     -H "Content-Type: application/json" \
+     -d '{"message": "请介绍一下人工智能"}' \
+     --no-buffer
+```
+
+#### Python客户端
+```python
+import requests
+
+# 基本对话
+response = requests.post(
+    "http://127.0.0.1:8000/chat",
+    json={"message": "你好，娜迦"}
+)
+result = response.json()
+print(result['response'])
+
+# 流式对话
+response = requests.post(
+    "http://127.0.0.1:8000/chat/stream",
+    json={"message": "请介绍一下机器学习"},
+    stream=True
+)
+
+for line in response.iter_lines():
+    if line and line.startswith(b'data: '):
+        import json
+        data = json.loads(line[6:])
+        if 'content' in data:
+            print(data['content'], end='')
+```
+
+#### JavaScript/Node.js客户端
+```javascript
+// 基本对话
+const response = await fetch('http://127.0.0.1:8000/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: '你好，娜迦' })
+});
+const result = await response.json();
+console.log(result.response);
+
+// 流式对话
+const streamResponse = await fetch('http://127.0.0.1:8000/chat/stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: '请介绍一下人工智能' })
+});
+
+const reader = streamResponse.body.getReader();
+const decoder = new TextDecoder();
+
+while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    
+    const chunk = decoder.decode(value);
+    const lines = chunk.split('\n');
+    
+    for (const line of lines) {
+        if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.slice(6));
+            if (data.content) {
+                process.stdout.write(data.content);
+            }
+        }
+    }
+}
+```
+
+### API错误处理
+
+API使用标准HTTP状态码：
+- `200` - 成功
+- `400` - 请求参数错误
+- `500` - 服务器内部错误
+- `503` - 服务不可用
+
+### 代理环境配置
+
+如果您的环境中配置了代理（如SOCKS代理），测试本地API时可能需要临时禁用：
+
+```bash
+# 临时禁用代理
+unset ALL_PROXY http_proxy https_proxy
+
+# 然后测试API
+curl http://127.0.0.1:8000/health
+```
