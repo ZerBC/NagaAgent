@@ -2,7 +2,7 @@ import logging,os,asyncio # 日志与系统
 from datetime import datetime # 时间
 from config import LOG_DIR,DEEPSEEK_API_KEY,DEEPSEEK_MODEL,TEMPERATURE,MAX_TOKENS,get_current_datetime,THEME_ROOTS,DEEPSEEK_BASE_URL,NAGA_SYSTEM_PROMPT,VOICE_ENABLED # 配置
 from summer.summer_faiss import faiss_recall,faiss_add,faiss_fuzzy_recall # faiss检索与入库
-from mcp_manager import get_mcp_manager, remove_tools_filter, HandoffInputData # 多功能管理
+from mcpserver.mcp_manager import get_mcp_manager, remove_tools_filter, HandoffInputData # 多功能管理
 from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX # handoff提示词
 from mcpserver.agent_playwright_master import PlaywrightAgent, extract_url # 导入浏览器相关类
 from openai import OpenAI,AsyncOpenAI # LLM
@@ -13,6 +13,7 @@ from voice.voice_handler import VoiceHandler # 语音处理
 import time # 时间戳打印
 from summer.memory_manager import MemoryManager  # 新增
 from mcpserver.mcp_registry import register_all_handoffs # 导入批量注册方法
+from handoff_executor import execute_plan
 now=lambda:time.strftime('%H:%M:%S:')+str(int(time.time()*1000)%10000) # 当前时间
 _builtin_print=print
 print=lambda *a,**k:sys.stderr.write('[print] '+(' '.join(map(str,a)))+'\n')
@@ -166,40 +167,9 @@ class NagaConversation: # 对话主类
    try:
     resp_json = json.loads(a)
     if "plan" in resp_json:
-     plan = resp_json["plan"]
-     steps = plan.get("steps", [])
-     context = {}
-     for idx, step in enumerate(steps):
-      desc = step.get("desc", "")
-      action = step.get("action")
-      if action and "agent" in action:
-       agent = action["agent"]
-       params = action.get("params", {})
-       # 自动检测并转换shell命令格式
-       if agent == "shell" and isinstance(params.get("command"), str):
-        # 如果是字符串命令，自动转换为powershell数组
-        old_cmd = params["command"]
-        params["command"] = ["powershell", "-Command", old_cmd]
-        yield ("娜迦", f"[警告] 第{idx+1}步命令为字符串，已自动转换为powershell数组：{params['command']}")
-       # 支持上下文传递
-       params["context"] = context
-       yield ("娜迦", f"正在执行第{idx+1}步：{desc}（agent: {agent}）")
-       try:
-        result = await s.mcp.handoff(agent, params)
-        # 新增：只提取核心内容，避免前端显示完整json
-        try:
-            result_json = json.loads(result)
-            msg = result_json.get("data", {}).get("content") or result_json.get("message") or str(result_json.get("status"))
-        except Exception:
-            msg = str(result)
-        yield ("娜迦", f"第{idx+1}步执行结果：{msg}")
-        context[f"step_{idx+1}_result"] = result
-       except Exception as e:
-        yield ("娜迦", f"第{idx+1}步执行失败：{e}")
-      else:
-       yield ("娜迦", f"第{idx+1}步：{desc}（无需自动执行）")
-     yield ("娜迦", f"所有分步执行已完成。")
-     return
+        async for step in execute_plan(resp_json, s.mcp):
+            yield ("娜迦", step.get("msg") or str(step))  # 实时反馈每一步
+        return
    except Exception as e:
     pass # 非plan结构或解析失败，继续原有流程
    

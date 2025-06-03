@@ -82,6 +82,18 @@ class LocalPlaywrightComputer(AsyncComputer):
             self._browser = None
             self._page = None
 
+    @staticmethod
+    async def is_browser_alive():
+        browser = LocalPlaywrightComputer._global_browser
+        try:
+            if browser is None:
+                return False
+            # 尝试获取浏览器的所有页面，如果报错说明已关闭
+            _ = browser.contexts
+            return True
+        except Exception:
+            return False
+
     async def _get_browser_and_page(self) -> Tuple[Browser, Page]:
         width, height = self.dimensions
         launch_args = [
@@ -89,17 +101,23 @@ class LocalPlaywrightComputer(AsyncComputer):
             "--disable-gpu",
             "--no-sandbox"
         ]
-        if not LocalPlaywrightComputer._global_playwright:
+        # 检查浏览器是否活着
+        if not await LocalPlaywrightComputer.is_browser_alive():
+            # 重新启动
+            if LocalPlaywrightComputer._global_playwright:
+                try:
+                    await LocalPlaywrightComputer._global_playwright.stop()
+                except Exception:
+                    pass
             LocalPlaywrightComputer._global_playwright = await async_playwright().start()
-        if not LocalPlaywrightComputer._global_browser:
             LocalPlaywrightComputer._global_browser = await LocalPlaywrightComputer._global_playwright.chromium.launch(
                 headless=PLAYWRIGHT_HEADLESS,
                 args=launch_args
             )
-        if not LocalPlaywrightComputer._global_page:
-            LocalPlaywrightComputer._global_page = await LocalPlaywrightComputer._global_browser.new_page()
-            await LocalPlaywrightComputer._global_page.set_viewport_size({"width": width, "height": height})
-        return LocalPlaywrightComputer._global_browser, LocalPlaywrightComputer._global_page
+        # 每次都新建分页
+        page = await LocalPlaywrightComputer._global_browser.new_page()
+        await page.set_viewport_size({"width": width, "height": height})
+        return LocalPlaywrightComputer._global_browser, page
 
     async def __aenter__(self):
         """异步上下文管理器入口，支持实例复用"""
