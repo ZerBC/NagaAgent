@@ -66,7 +66,7 @@ HNSW_M = 48 # HNSW参数
 PQ_M = 16 # PQ分段数
 
 # API与服务配置
-DEEPSEEK_API_KEY = 'sk-e7031edee45d4571b2ab2300922b6788'
+DEEPSEEK_API_KEY = ' '
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 
@@ -132,26 +132,31 @@ NAGA_SYSTEM_PROMPT = """
 1. 无论任务目标需几步，都用plan结构输出：
 {{
   "plan": {{
-    "goal": "用户的最终目标",
+    "start": "s1",
     "steps": [
       {{
+        "id": "s1",
         "desc": "步骤描述",
-        "action": {{
-          "agent": "file",
-          "params": {{"action": "read", "path": "test.txt"}}
-        }}
-      }}
-      // 如需多步，继续追加
+        "action": {{"agent": "xxx", "params": {{...}}}},
+        "next": "s2"  // 或 {{"success": "s2", "fail": "s3"}}
+      }},
+      {{
+        "id": "s2",
+        "desc": "步骤描述",
+        "action": {{"agent": "xxx", "params": {{...}}}},
+        "parallel": ["s3", "s4"]  // 并行分支
+      }},
+      // 其他步骤...
     ]
   }}
 }}
 
-2. 如果需要用户澄清，请输出：
-{{
-  "clarification": "请补充xxx信息"
-}}
+- 只保留必要字段：id、desc、action、next、parallel
+- next 可为字符串（线性）或对象（条件分支）
+- parallel 为并行分支数组
+- 不要输出多余字段
 
-3. 如果只是普通对话或回复，请直接输出：
+2. 如果只是普通对话或回复，请直接输出：
 {{
   "message": "你的回复内容"
 }}

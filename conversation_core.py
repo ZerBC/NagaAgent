@@ -167,11 +167,40 @@ class NagaConversation: # 对话主类
    try:
     resp_json = json.loads(a)
     if "plan" in resp_json:
+        # 链式任务流和分步机制已由execute_plan自动判断
+        step_counter = 0
         async for step in execute_plan(resp_json, s.mcp):
-            yield ("娜迦", step.get("msg") or str(step))  # 实时反馈每一步
+            status = step.get("status")
+            desc = step.get("desc", "")
+            msg = step.get("msg", "")
+            # 智能分支/并行/条件跳转提示
+            if step.get("type") == "done":
+                context = step.get("context", {})
+                summary = msg
+                if context:
+                    summary += "\n\n【所有步骤结果汇总】\n" + json.dumps(context, ensure_ascii=False, indent=2)
+                yield ("娜迦", summary)
+            elif status == "success":
+                step_counter += 1
+                yield ("娜迦", f"✅ 步骤{step_counter if desc else ''}: {desc}\n{msg}")
+            elif status == "error":
+                step_counter += 1
+                yield ("娜迦", f"❌ 步骤{step_counter if desc else ''}: {desc}\n{msg}")
+            elif status == "start":
+                # 检测并行/分支/条件跳转
+                if "并行" in msg or "分支" in msg or "branch" in msg or "parallel" in msg:
+                    yield ("娜迦", f"🔀 {desc}（分支/并行/条件跳转开始）")
+                else:
+                    step_counter += 1
+                    yield ("娜迦", f"➡️ 开始步骤{step_counter if desc else ''}: {desc}")
+            elif status == "skip":
+                step_counter += 1
+                yield ("娜迦", f"⏭️ 跳过步骤{step_counter if desc else ''}: {desc}")
+            else:
+                yield ("娜迦", msg or str(step))
         return
    except Exception as e:
-    pass # 非plan结构或解析失败，继续原有流程
+      yield ("娜迦", f"⚠️ plan结构解析失败，已回退普通对话流程。")
    
    # 检查LLM是否建议handoff
    if "[handoff]" in a:

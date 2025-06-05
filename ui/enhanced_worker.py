@@ -155,7 +155,7 @@ class StreamingWorker(EnhancedWorker):
                 return ""
             
             self.status_changed.emit("正在思考...")
-            self.progress_updated.emit(30, "AI正在分析")
+            self.progress_updated.emit(30, "[夏园系统]:正在使用CPU推理")
             
             # 开始流式处理
             result_chunks = []

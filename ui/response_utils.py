@@ -3,7 +3,7 @@ import json
 def extract_message(response: str) -> str:
     """
     解析后端返回的json字符串，优先取data.content，其次message，否则原样返回
-    支持递归解析嵌套JSON
+    支持递归解析嵌套JSON和多步数组，自动用\n分隔多条消息
     :param response: 后端返回的json字符串
     :return: message内容（若解析失败则原样返回）
     """
@@ -13,6 +13,9 @@ def extract_message(response: str) -> str:
     # 先尝试直接解析
     try:
         data = json.loads(response)
+        # 如果是数组，递归拼接所有消息
+        if isinstance(data, list):
+            return '\n'.join([_recursive_extract(item) for item in data if _recursive_extract(item)])
         extracted = _recursive_extract(data)
         if extracted and extracted != response:
             return extracted
@@ -27,6 +30,8 @@ def extract_message(response: str) -> str:
             # 从第一个{开始尝试解析
             json_part = response[start_pos:]
             data = json.loads(json_part)
+            if isinstance(data, list):
+                return '\n'.join([_recursive_extract(item) for item in data if _recursive_extract(item)])
             extracted = _recursive_extract(data)
             if extracted:
                 return extracted

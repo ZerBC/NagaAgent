@@ -126,6 +126,7 @@ API_SERVER_AUTO_START = True  # 启动时自动启动API服务器
 - **前端换行符自动适配，无论后端返回`\n`还是`\\n`，PyQt界面都能正确分行显示**
 - **所有Agent的handoff schema和注册元数据已集中在`mcpserver/mcp_registry.py`，主流程和管理器极简，扩展维护更方便。只需维护一处即可批量注册/扩展所有Agent服务。**
 - **自动注册/热插拔Agent机制，新增/删除Agent只需增删py文件，无需重启主程序**
+- 聊天窗口支持**Markdown语法**，包括标题、粗体、斜体、代码块、表格、图片等。
 
 ---
 
@@ -136,7 +137,11 @@ NagaAgent/
 ├── config.py                   # 全局配置
 ├── api_server.py               # RESTful API服务器
 ├── conversation_core.py        # 对话核心（含兼容模式主逻辑）
-├── mcp_manager.py              # MCP服务管理
+├── handoff_executor.py         # 任务流调度器，自动解析plan并执行多步/分支/并行任务
+├── mcpserver/
+│   ├── mcp_manager.py          # MCP服务管理
+│   ├── mcp_registry.py         # Agent注册与schema元数据
+│   ├── agent_xxx/              # 各类自定义Agent（如file、coder、browser等）
 ├── requirements.txt            # 依赖
 ├── setup.ps1                   # Windows配置脚本
 ├── start.bat                   # Windows启动脚本
@@ -300,22 +305,60 @@ MIT License
 
 系统支持LLM输出plan结构时自动解析并依次执行每一步：
 - 每步可包含action结构，指明agent和params参数
-- 系统自动调用对应agent，支持上下文在多步间传递
+- 支持每步用id唯一标识，next可为字符串（线性）、对象（条件分支），parallel为并行分支数组
+- 系统自动解析plan为任务图，支持链式、条件跳转、分支、并行等任意流程
 - 每步执行结果实时反馈，全部完成后汇总
 - 其它无action的步骤仅输出描述，不自动执行
 
-示例plan结构：
+**精简plan结构示例：**
 ```json
 {
   "plan": {
-    "goal": "完成复杂多步任务",
+    "start": "s1",
     "steps": [
-      {"desc": "第一步描述", "action": {"agent": "file", "params": {"action": "read", "path": "test.txt"}}},
-      {"desc": "第二步描述", "action": {"agent": "coder", "params": {"action": "edit", "file": "test.py", "code": "print('hello')"}}}
+      {
+        "id": "s1",
+        "desc": "读取文件",
+        "action": {"agent": "file", "params": {"action": "read", "path": "test.txt"}},
+        "next": {"success": "s2", "fail": "s3"}
+      },
+      {
+        "id": "s2",
+        "desc": "写入文件",
+        "action": {"agent": "file", "params": {"action": "write", "path": "out.txt"}},
+        "next": "s4"
+      },
+      {
+        "id": "s3",
+        "desc": "失败通知",
+        "action": {"agent": "notify", "params": {"msg": "失败"}}
+      },
+      {
+        "id": "s4",
+        "desc": "并行处理",
+        "parallel": ["s5", "s6"]
+      },
+      {
+        "id": "s5",
+        "desc": "分支A",
+        "action": {"agent": "A", "params": {}}
+      },
+      {
+        "id": "s6",
+        "desc": "分支B",
+        "action": {"agent": "B", "params": {}}
+      }
     ]
   }
 }
 ```
+
+- 只保留必要字段：id、desc、action、next、parallel
+- next可为字符串（线性）或对象（条件分支）
+- parallel为并行分支数组
+- 不要输出多余字段
+
+**系统会自动解析plan为任务图，支持链式、分支、并行等复杂流程，兼容原有线性plan。**
 
 如需自定义Agent或扩展plan协议，请参考`mcpserver/agent_xxx/`和`mcp_registry.py`。
 

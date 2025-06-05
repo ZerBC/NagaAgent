@@ -52,6 +52,7 @@ pyaudio>=0.2.14
 # GUI框架
 pyqt5>=5.15.11
 
+
 # 其他工具
 tiktoken
 bottleneck>=1.3.6
