@@ -1,0 +1,80 @@
+# agent_app_launcher.py # 应用启动与管理Agent
+import os
+import platform
+import subprocess
+import asyncio
+from .app_cache import get_cached_apps, preload_apps  # 应用缓存模块
+from .app_name_matcher import find_best_app, update_alias
+
+class AppLauncherAgent(object):
+    """应用启动与管理Agent，支持打开、列出本机应用"""  # 类注释
+    name = "AppLauncher Agent"  # Agent名称
+
+    def run(self, action, app=None, args=None):
+        """
+        action: 操作类型（open/list/refresh）
+        app: 应用名或路径
+        args: 启动参数
+        """
+        if action == "open":
+            return self.open_app(app, args)  # 打开应用
+        elif action == "list":
+            return {"status": "success", "apps": get_cached_apps()}  # 返回缓存应用列表
+        elif action == "refresh":
+            asyncio.create_task(preload_apps())  # 异步刷新
+            return {"status": "success", "message": "正在刷新应用列表，请稍后再试"}
+        else:
+            return {"status": "error", "message": f"未知操作: {action}"}  # 错误处理
+
+    def open_app(self, app, args=None):
+        """打开指定应用"""
+        print(f"open_app收到app参数: {app}")
+        print(f"缓存应用名: {[item['name'] for item in get_cached_apps()]}")
+        exe_path = None
+        app_list = get_cached_apps()
+        # 1. 智能适配
+        match = find_best_app(app, app_list) if app else None
+        if match:
+            exe_path = match["path"]
+            # 动态学习
+            update_alias(app, match["name"])
+        # 2. 支持绝对路径
+        if not exe_path and app and os.path.exists(app):
+            exe_path = app
+        if not exe_path or not os.path.exists(exe_path):
+            return {"status": "error", "message": f"未找到应用: {app}"}
+        try:
+            if exe_path.lower().endswith('.lnk'):
+                os.startfile(exe_path)  # 用系统方式打开快捷方式
+            else:
+                cmd = [exe_path]
+                if args:
+                    if isinstance(args, str):
+                        cmd += args.split()
+                    elif isinstance(args, list):
+                        cmd += args
+                subprocess.Popen(cmd, shell=False)
+            return {"status": "success", "message": f"已启动: {exe_path}"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    async def handle_handoff(self, task):
+        """
+        MCP标准接口，处理handoff请求
+        :param task: dict，包含action/app/args等
+        """
+        action = (
+            task.get("action") or
+            task.get("operation") or
+            task.get("task") or
+            ("open" if any(k in task for k in ["app", "app_name", "check_running", "wait_for", "report"]) else None)
+        )
+        app = (
+            task.get("app") or
+            task.get("app_name") or
+            task.get("check_running") or
+            task.get("wait_for") or
+            task.get("report")
+        )
+        args = task.get("args")
+        return self.run(action, app, args)

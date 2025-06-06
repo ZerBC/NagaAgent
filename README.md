@@ -523,3 +523,57 @@ unset ALL_PROXY http_proxy https_proxy
 # 然后测试API
 curl http://127.0.0.1:8000/health
 ```
+
+---
+
+### 本地应用启动与管理（AppLauncher Agent）
+
+#### 功能简介
+- 支持通过MCP自动打开电脑上的任意应用（如微信、WPS、网易云音乐等），无需手动配置应用路径。
+- 自动扫描并缓存所有本机可用应用（包括开始菜单快捷方式、注册表、Applications等），支持智能模糊匹配和别名自学习。
+- 兼容Windows、Mac、Linux，支持.lnk快捷方式和.exe等可执行文件。
+
+#### 支持的操作
+- `open`：打开指定应用
+- `list`：列出所有可用应用
+- `refresh`：刷新应用缓存
+
+#### 参数说明
+| 参数名   | 类型   | 说明                 | 是否必填 |
+|----------|--------|----------------------|----------|
+| action   | string | 操作类型（open/list/refresh） | 是       |
+| app      | string | 应用名或路径（open时必填）   | 否       |
+| args     | array  | 启动参数（可选）           | 否       |
+
+#### 用法示例
+- 打开微信：
+  ```json
+  {"action": "open", "app": "微信"}
+  ```
+- 打开WPS Office：
+  ```json
+  {"action": "open", "app": "WPS Office"}
+  ```
+- 打开网易云音乐：
+  ```json
+  {"action": "open", "app": "网易云音乐"}
+  ```
+- 列出所有可用应用：
+  ```json
+  {"action": "list"}
+  ```
+- 刷新应用缓存：
+  ```json
+  {"action": "refresh"}
+  ```
+
+#### 智能适配说明
+- 支持拼音、英文、别名、模糊匹配等多策略查找，极大提升容错率。
+- 用户每次成功打开后，系统会自动记录"用户说法→真实应用名"映射，越用越准。
+- 支持.lnk快捷方式自动用系统方式打开，.exe等可执行文件用subprocess启动。
+
+#### 常见问题与注意事项
+- 如果"未找到应用"，请先用`list`操作确认缓存中真实的应用名。
+- 新安装应用后请先`refresh`再`open`。
+- Windows下建议将常用应用快捷方式放到开始菜单，便于自动识别。
+- 仅支持明确的action（open/list/refresh），其他操作会被拒绝。

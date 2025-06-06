@@ -17,6 +17,9 @@ from config import (
     API_SERVER_PORT
 )
 
+# 新增：导入应用预加载
+from mcpserver.agent_open_launcher.app_cache import preload_apps, get_cached_apps
+
 n=NagaConversation()
 def show_help():print('系统命令: 清屏, 查看索引, 帮助, 退出')
 def show_index():print('主题分片索引已集成，无需单独索引查看')
@@ -80,6 +83,11 @@ mm = MemoryManager()
 threading.Thread(target=mm.forget_long_term, daemon=True).start()  # 启动时异步清理一次
 
 print('='*30+'\n娜迦系统已启动\n'+'='*30)
+
+# 启动时同步预加载应用列表
+preload_apps()
+
+print(f"预加载完成，缓存应用数: {len(get_cached_apps())}")
 
 # 自动启动API服务器
 if API_SERVER_ENABLED and API_SERVER_AUTO_START:

@@ -73,6 +73,22 @@ HANDOFF_SCHEMAS = [
         "agent_name": "Coder Agent",
         "strict_schema": False
     },
+    {
+        "service_name": "app_launcher",
+        "tool_name": "app_launcher_handoff",
+        "tool_description": "本地应用启动与管理",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "description": "操作类型（open/list/refresh）"},
+                "app": {"type": "string", "description": "应用名或路径"},
+                "args": {"type": "array", "description": "启动参数", "items": {"type": "string"}, "default": []}
+            },
+            "required": ["action"]
+        },
+        "agent_name": "AppLauncher Agent",
+        "strict_schema": False
+    },
 ]
 
 # 删除shell相关schema
