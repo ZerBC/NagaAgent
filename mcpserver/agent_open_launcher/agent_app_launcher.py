@@ -10,6 +10,12 @@ class AppLauncherAgent(object):
     """应用启动与管理Agent，支持打开、列出本机应用"""  # 类注释
     name = "AppLauncher Agent"  # Agent名称
 
+    def __init__(self):
+        from .app_cache import preload_apps, get_cached_apps
+        preload_apps()  # 初始化时同步预加载
+        import sys
+        sys.stderr.write(f'AppLauncherAgent初始化完成，预加载应用数: {len(get_cached_apps())}\n')
+
     def run(self, action, app=None, args=None):
         """
         action: 操作类型（open/list/refresh）

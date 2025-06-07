@@ -89,6 +89,22 @@ HANDOFF_SCHEMAS = [
         "agent_name": "AppLauncher Agent",
         "strict_schema": False
     },
+    {
+        "service_name": "weather_time",
+        "tool_name": "weather_time_handoff",
+        "tool_description": "天气和时间查询",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "description": "操作类型（weather/time）"},
+                "ip": {"type": "string", "description": "用户IP，可选，自动获取"},
+                "city": {"type": "string", "description": "城市名，可选，自动识别"}
+            },
+            "required": ["action"]
+        },
+        "agent_name": "WeatherTime Agent",
+        "strict_schema": False
+    },
 ]
 
 # 删除shell相关schema
@@ -98,6 +114,7 @@ HANDOFF_SCHEMAS = [
 
 def register_all_handoffs(mcp_manager):
     """批量注册所有handoff服务"""
+    registered = []
     for schema in HANDOFF_SCHEMAS:
         mcp_manager.register_handoff(
             service_name=schema["service_name"],
@@ -106,4 +123,7 @@ def register_all_handoffs(mcp_manager):
             input_schema=schema["input_schema"],
             agent_name=schema["agent_name"],
             strict_schema=schema.get("strict_schema", False)
-        ) 
+        )
+        registered.append(schema["service_name"])
+    import sys
+    sys.stderr.write(f'当前已注册服务: {registered}\n')

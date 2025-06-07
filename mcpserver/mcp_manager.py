@@ -155,7 +155,6 @@ class MCPManager:
             "filter_fn": remove_tools_filter,  # 使用函数而不是类实例
             "strict_schema": strict_schema
         }
-        sys.stderr.write(f"当前已注册服务: {list(self.services.keys())}\n")
         
     async def _default_handoff_callback(
         self,

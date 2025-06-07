@@ -84,11 +84,6 @@ threading.Thread(target=mm.forget_long_term, daemon=True).start()  # 启动时�
 
 print('='*30+'\n娜迦系统已启动\n'+'='*30)
 
-# 启动时同步预加载应用列表
-preload_apps()
-
-print(f"预加载完成，缓存应用数: {len(get_cached_apps())}")
-
 # 自动启动API服务器
 if API_SERVER_ENABLED and API_SERVER_AUTO_START:
     start_api_server()
