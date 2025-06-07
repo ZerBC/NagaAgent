@@ -263,7 +263,7 @@ class PlaywrightAgent(Agent):
             model="computer-use-preview",
             model_settings=ModelSettings(truncation="auto")
         )
-        sys.stderr.write('PlaywrightAgent初始化完成\n')
+        sys.stderr.write('✅ PlaywrightAgent初始化完成\n')
 
     async def handle_handoff(self, data: dict) -> str:
         """智能处理handoff请求：支持url直达、query自动识别网址或搜索并打开第一个结果，并支持按selector输入/点击"""

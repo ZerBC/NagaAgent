@@ -14,7 +14,7 @@ class AppLauncherAgent(object):
         from .app_cache import preload_apps, get_cached_apps
         preload_apps()  # 初始化时同步预加载
         import sys
-        sys.stderr.write(f'AppLauncherAgent初始化完成，预加载应用数: {len(get_cached_apps())}\n')
+        sys.stderr.write(f'✅ AppLauncherAgent初始化完成，预加载应用数: {len(get_cached_apps())}\n')
 
     def run(self, action, app=None, args=None):
         """

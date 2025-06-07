@@ -66,7 +66,7 @@ class CoderAgent(Agent):
             tools=[ComputerTool(CodeComputer())], # 注入工具
             model="computer-use-preview" # 使用统一模型
         )
-        import sys; sys.stderr.write('CoderAgent初始化完成\n')
+        import sys; sys.stderr.write('✅ CoderAgent初始化完成\n')
     async def handle_handoff(self, data: dict) -> str:
         try:
             action = data.get("action")

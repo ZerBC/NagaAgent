@@ -7,11 +7,9 @@ APP_LIST_CACHE = []  # 全局缓存
 def preload_apps():
     """同步预加载本机应用列表"""
     global APP_LIST_CACHE
-    print("正在扫描本机应用，请稍候...")
     apps = scan_apps()
     APP_LIST_CACHE.clear()
     APP_LIST_CACHE.extend(apps)
-    print(f"已预加载{len(APP_LIST_CACHE)}个应用。")
 
 def get_cached_apps():
     """获取缓存的应用列表"""

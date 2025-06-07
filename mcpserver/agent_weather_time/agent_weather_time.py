@@ -21,7 +21,7 @@ class WeatherTimeTool:
             if loop.is_running():
                 asyncio.create_task(self._preload_ip_info())
             else:
-                self._ip_info = loop.run_until_complete(self.get_ip_info())
+                self._ip_info = None # 不再异步获取IP
         except Exception:
             self._ip_info = None
 
@@ -43,15 +43,7 @@ class WeatherTimeTool:
             self._local_city = None
 
     async def _preload_ip_info(self):
-        self._ip_info = await self.get_ip_info()
-
-    async def get_ip_info(self):
-        """获取用户IP和城市信息"""
-        url = 'http://ip-api.com/json/'
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as resp:
-                data = await resp.json()
-                return data # 返回完整IP信息
+        pass # 兼容保留，不再异步获取IP
 
     async def get_weather(self, city):
         """获取指定城市天气"""
@@ -61,22 +53,29 @@ class WeatherTimeTool:
                 data = await resp.json()
                 return data
 
-    async def get_time(self, timezone):
-        """获取指定时区当前时间"""
-        from datetime import datetime
-        import pytz
-        try:
-            tz = pytz.timezone(timezone)
-            now = datetime.now(tz)
-            return now.strftime('%Y-%m-%d %H:%M:%S')
-        except Exception:
-            return None
-
     def parse_weather_query(self, query, city, weather_data):
         """
         根据用户query和天气数据，返回对应的天气信息
-        支持当前、明天、后天、未来N天、指定日期、日出日落、最高温、最低温、风力、湿度等
+        支持当前、明天、后天、未来N天、指定日期、日出日落、最高温、最低温、风力、湿度、时间等
         """
+        # 0. 时间查询
+        if re.search(r'(时间|几点|now|current time|time)', query):
+            # 优先用localObsDateTime字段
+            try:
+                local_time = weather_data['current_condition'][0].get('localObsDateTime')
+                if local_time:
+                    return f'{city}当前时间：{local_time}'
+            except Exception:
+                pass
+            # 兜底：用observation_time字段
+            try:
+                obs_time = weather_data['current_condition'][0].get('observation_time')
+                if obs_time:
+                    return f'{city}观测时间：{obs_time}'
+            except Exception:
+                pass
+            return f'{city}未能获取到当前时间信息'
+
         # 1. 当前天气
         if not query or re.search(r'(现在|当前|实时|today|current)', query):
             current = weather_data['current_condition'][0]
@@ -185,14 +184,14 @@ class WeatherTimeTool:
                 elif 'weather' in format or '天气' in format:
                     action = 'weather'
         # 1. 获取IP和城市（优先用缓存）
-        ip_info = self._ip_info or (await self.get_ip_info()) if not (ip and city) else {}
+        ip_info = self._ip_info or {} # 不再异步获取IP
         if not city:
             city = ip_info.get('city', '')
         if not ip:
             ip = ip_info.get('query', '')
         timezone = ip_info.get('timezone', 'Asia/Shanghai')
         # 2. 根据action处理
-        if action in ['weather', 'get_weather', 'current_weather']:
+        if action in ['weather', 'get_weather', 'current_weather', 'time', 'get_time', 'current_time']:
             if not city:
                 return {'status': 'error', 'message': '未能识别城市'}
             weather = await self.get_weather(city)
@@ -205,12 +204,6 @@ class WeatherTimeTool:
                 }
             except Exception:
                 return {'status': 'error', 'message': '天气API返回异常', 'data': weather}
-        elif action in ['time', 'get_time', 'current_time']:
-            t = await self.get_time(timezone)
-            if t:
-                return {'status': 'ok', 'message': f'{city}当前时间：{t}', 'data': {'city': city, 'timezone': timezone, 'time': t}}
-            else:
-                return {'status': 'error', 'message': '时区解析失败', 'data': {'city': city, 'timezone': timezone}}
         else:
             return {'status': 'error', 'message': f'未知操作: {action}'}
 
@@ -225,10 +218,9 @@ class WeatherTimeAgent(Agent):
             model="weather-time-use-preview" # 使用统一模型
         )
         import sys
-        ip_info = getattr(self._tool, '_ip_info', None)
-        ip_str = ip_info.get('query') if ip_info else '未获取到IP'
+        ip_str = getattr(self._tool, '_local_ip', '未获取到IP')  # 直接用本地IP
         city_str = getattr(self._tool, '_local_city', '未知城市') # 获取本地城市
-        sys.stderr.write(f'WeatherTimeAgent初始化完成，登陆地址：{city_str}\n')
+        sys.stderr.write(f'✅ WeatherTimeAgent初始化完成，登陆地址：{city_str}\n')
 
     async def handle_handoff(self, task: dict) -> str:
         try:

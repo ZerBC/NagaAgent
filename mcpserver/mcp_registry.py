@@ -1,21 +1,46 @@
 # mcp_registry.py # 自动注册所有MCP服务和handoff schema
-import importlib,inspect,os
+import importlib, inspect, os
 from pathlib import Path
+import concurrent.futures # 新增线程池支持
 
-MCP_REGISTRY={} # 全局MCP服务池
+MCP_REGISTRY = {} # 全局MCP服务池
+
+def is_concrete_class(cls):
+    # 过滤掉抽象基类
+    if hasattr(cls, '__abstractmethods__') and len(cls.__abstractmethods__) > 0:
+        return False
+    # 彻底过滤所有名为Agent或ComputerTool的类（无论在哪个模块）
+    if cls.__name__ in ['Agent', 'ComputerTool']:
+        return False
+    return True
 
 def auto_register_mcp(mcp_dir='mcpserver'):
- d=Path(mcp_dir)
- for f in d.glob('**/*.py'):
-  if f.stem.startswith('__'):continue
-  m=importlib.import_module(f'{f.parent.as_posix().replace("/", ".")}.{f.stem}')
-  for n,o in inspect.getmembers(m,inspect.isclass):
-   if n.endswith('Agent') or n.endswith('Tool'):
-    try:
-     instance = o()
-     key = getattr(instance, 'name', n)
-     MCP_REGISTRY[key] = instance # 用name属性作为key，保证与handoff一致
-    except Exception: pass # 跳过需要参数的
+    d = Path(mcp_dir)
+    agent_classes = [] # 需要初始化的Agent/Tool类列表
+    for f in d.glob('**/*.py'):
+        if f.stem.startswith('__'): continue
+        m = importlib.import_module(f'{f.parent.as_posix().replace("/", ".")}.{f.stem}')
+        for n, o in inspect.getmembers(m, inspect.isclass):
+            if (n.endswith('Agent') or n.endswith('Tool')) and is_concrete_class(o):
+                agent_classes.append((n, o))
+
+    def init_agent(n_o):
+        n, o = n_o
+        try:
+            instance = o()
+            key = getattr(instance, 'name', n)
+            MCP_REGISTRY[key] = instance # 用name属性作为key，保证与handoff一致
+            return f"{key} 初始化成功"
+        except Exception as e:
+            return f"{n} 初始化失败: {e}"
+
+    results = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        future_to_class = {executor.submit(init_agent, n_o): n_o for n_o in agent_classes}
+        for future in concurrent.futures.as_completed(future_to_class):
+            result = future.result()
+            results.append(result)
+    return results
 
 auto_register_mcp()
 
