@@ -243,3 +243,11 @@ CORE_MEMORY_SIZE = 100 # 核心记忆容量
 ARCHIVAL_MEMORY_SIZE = 500 # 归档记忆容量
 LONG_TERM_MEMORY_SIZE = 5000 # 长期记忆容量
 SHORT_TERM_MEMORY_SIZE = 50 # 短期记忆容量
+
+# TTS服务相关配置 # 统一管理
+TTS_API_KEY = os.getenv('TTS_API_KEY', 'your_api_key_here') # TTS服务API密钥
+TTS_PORT = int(os.getenv('TTS_PORT', 5050)) # TTS服务端口
+TTS_DEFAULT_VOICE = os.getenv('TTS_DEFAULT_VOICE', 'en-US-AvaNeural') # 默认语音
+TTS_DEFAULT_FORMAT = os.getenv('TTS_DEFAULT_FORMAT', 'mp3') # 默认音频格式
+TTS_DEFAULT_SPEED = float(os.getenv('TTS_DEFAULT_SPEED', 1.0)) # 默认语速
+TTS_DEFAULT_LANGUAGE = os.getenv('TTS_DEFAULT_LANGUAGE', 'en-US') # 默认语言

@@ -8,12 +8,15 @@ from mcpserver.agent_playwright_master import PlaywrightAgent, extract_url # 导
 from openai import OpenAI,AsyncOpenAI # LLM
 import difflib # 模糊匹配
 import sys,json,traceback
-from voice.voice_config import config as vcfg # 语音配置
-from voice.voice_handler import VoiceHandler # 语音处理
 import time # 时间戳打印
 from summer.memory_manager import MemoryManager  # 新增
 from mcpserver.mcp_registry import register_all_handoffs # 导入批量注册方法
 from handoff_executor import execute_plan
+from voice.tts_handler import generate_speech, get_models, get_voices # TTS功能
+import config
+import asyncio
+import json
+import websockets 
 now=lambda:time.strftime('%H:%M:%S:')+str(int(time.time()*1000)%10000) # 当前时间
 _builtin_print=print
 print=lambda *a,**k:sys.stderr.write('[print] '+(' '.join(map(str,a)))+'\n')
@@ -35,7 +38,6 @@ class NagaConversation: # 对话主类
   s.mcp=get_mcp_manager()
   s.messages=[]
   s.dev_mode=False
-  s.voice=VoiceHandler() if vcfg.ENABLED else None
   s.client=OpenAI(api_key=DEEPSEEK_API_KEY,base_url=DEEPSEEK_BASE_URL.rstrip('/')+'/')
   s.async_client=AsyncOpenAI(api_key=DEEPSEEK_API_KEY,base_url=DEEPSEEK_BASE_URL.rstrip('/')+'/')
   s.memory = MemoryManager()  # 新增：初始化记忆管理器
@@ -254,12 +256,26 @@ class NagaConversation: # 对话主类
    yield ("娜迦",f"[MCP异常]: {e}");return
 
 async def process_user_message(s,msg):
-    if vcfg.ENABLED and not msg: #无文本输入时启动语音识别
+    if VOICE_ENABLED and not msg: #无文本输入时启动语音识别
         async for text in s.voice.stt_stream():
             if text:msg=text;break
     return await s.process(msg)
 
-async def send_ai_message(s,msg):
-    if vcfg.ENABLED: #启用语音时转换为语音
-        async for _ in s.voice.tts_stream(msg):pass
-    return msg 
+async def send_ai_message(s, msg):
+    # 启用语音时，通过WebSocket流式推送到voice/genVoice服务
+    if config.VOICE_ENABLED:
+        ws_url = f"ws://127.0.0.1:{config.TTS_PORT}/genVoice"  # WebSocket服务地址
+        try:
+            async with websockets.connect(ws_url) as websocket:
+                await websocket.send(msg)  # 发送文本到TTS服务
+                while True:
+                    response = await websocket.recv()  # 接收音频流（json）
+                    data = json.loads(response)
+                    # data结构: {"seq":..., "text":..., "wav_base64":..., "duration":...}
+                    # 这里可以推送data到前端或本地播放器
+                    print(f"收到音频片段: 序号{data['seq']}，时长{data['duration']}秒")  # 示例：打印信息
+                    # 如需流式返回，可 yield data
+                    # 可根据需求break或继续接收
+        except Exception as e:
+            print(f"WebSocket TTS服务调用异常: {e}")
+    return msg  # 始终返回文本
