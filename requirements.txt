@@ -5,8 +5,21 @@ openai-agents>=0.0.13
 python-dotenv>=1.1.0
 requests>=2.32.3
 aiohttp>=3.11.18
+pytz>=2024.1
 colorama>=0.4.6
 python-dateutil>=2.9.0.post0
+
+# 流式语音交互相关依赖
+flask-cors
+flask
+gevent
+python-dotenv
+edge-tts
+emoji
+fastapi
+uvicorn
+librosa
+websockets
 
 # AI和向量相关 - 固定兼容版本
 numpy>=1.24.0,<2.0.0
