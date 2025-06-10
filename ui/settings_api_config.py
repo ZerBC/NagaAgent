@@ -3,7 +3,6 @@ from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QLineEdi
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 import config # 导入全局配置
-import re
 
 def read_api_key():
     # 优先读取.env
@@ -34,21 +33,15 @@ def write_api_key(new_key):
     with open(env_path, 'w', encoding='utf-8') as f:
         f.writelines(env_lines)
     # 写入config.py
-    config_path = config.__file__  # 直接用绝对路径
+    config_path = os.path.join(os.path.dirname(config.__file__), 'config.py')
     with open(config_path, 'r', encoding='utf-8') as f:
-        content = f.read()
-    # 用正则只替换实际赋值行
-    new_content, n = re.subn(
-        r"^DEEPSEEK_API_KEY\s*=\s*['\"].*?['\"]",
-        f"DEEPSEEK_API_KEY = '{new_key}'",
-        content,
-        flags=re.MULTILINE
-    )
-    if n == 0:
-        # 没有找到，追加到文件末尾
-        new_content += f"\nDEEPSEEK_API_KEY = '{new_key}'\n"
+        lines = f.readlines()
+    for i, line in enumerate(lines):
+        if line.strip().startswith('DEEPSEEK_API_KEY'):
+            lines[i] = f"DEEPSEEK_API_KEY = '{new_key}'\n"
+            break
     with open(config_path, 'w', encoding='utf-8') as f:
-        f.write(new_content)
+        f.writelines(lines)
 
 class ApiConfigWidget(QWidget):
     def __init__(s, parent=None):
