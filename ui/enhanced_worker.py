@@ -17,6 +17,7 @@ class EnhancedWorker(QThread):
     status_changed = pyqtSignal(str)  # 状态变化信号
     error_occurred = pyqtSignal(str)  # 错误发生信号
     partial_result = pyqtSignal(str)  # 部分结果信号（流式输出）
+    event_occurred = pyqtSignal(str, dict)  # AI事件信号
     
     def __init__(self, naga, user_input, parent=None):
         super().__init__(parent)
@@ -88,6 +89,11 @@ class EnhancedWorker(QThread):
             self.status_changed.emit("正在生成回复...")
             self.progress_updated.emit(40, "AI正在思考")
             
+            # 发送生成查询事件
+            self.event_occurred.emit("generate_query", {
+                "query_list": ["查询1", "查询2", "查询3"]  # 示例数据
+            })
+            
             async for chunk in self.naga.process(self.user_input):
                 if self.is_cancelled:
                     break
@@ -102,6 +108,26 @@ class EnhancedWorker(QThread):
                         result_chunks.append(content_str)
                         # 发送部分结果用于实时显示
                         self.partial_result.emit(content_str)
+                        
+                        # 发送网络研究事件
+                        if chunk_count == 1:
+                            self.event_occurred.emit("web_research", {
+                                "sources_gathered": [
+                                    {"label": "来源1", "content": "内容1"},
+                                    {"label": "来源2", "content": "内容2"}
+                                ]
+                            })
+                        
+                        # 发送反思事件
+                        if chunk_count == 2:
+                            self.event_occurred.emit("reflection", {
+                                "is_sufficient": True,
+                                "follow_up_queries": []
+                            })
+                        
+                        # 发送生成答案事件
+                        if chunk_count == 3:
+                            self.event_occurred.emit("finalize_answer", {})
                 else:
                     content_str = str(chunk)
                     result_chunks.append(content_str)
@@ -157,6 +183,11 @@ class StreamingWorker(EnhancedWorker):
             self.status_changed.emit("正在思考...")
             self.progress_updated.emit(30, "[夏园系统]:正在使用CPU推理")
             
+            # 发送生成查询事件
+            self.event_occurred.emit("generate_query", {
+                "query_list": ["查询1", "查询2", "查询3"]  # 示例数据
+            })
+            
             # 开始流式处理
             result_chunks = []
             word_count = 0
@@ -178,6 +209,26 @@ class StreamingWorker(EnhancedWorker):
                         # 更新缓冲区用于实时显示
                         self.streaming_buffer += content_str
                         word_count += len(content_str)
+                        
+                        # 发送网络研究事件
+                        if word_count < 50:
+                            self.event_occurred.emit("web_research", {
+                                "sources_gathered": [
+                                    {"label": "来源1", "content": "内容1"},
+                                    {"label": "来源2", "content": "内容2"}
+                                ]
+                            })
+                        
+                        # 发送反思事件
+                        if 50 <= word_count < 200:
+                            self.event_occurred.emit("reflection", {
+                                "is_sufficient": True,
+                                "follow_up_queries": []
+                            })
+                        
+                        # 发送生成答案事件
+                        if word_count >= 200:
+                            self.event_occurred.emit("finalize_answer", {})
                 else:
                     content_str = str(chunk)
                     result_chunks.append(content_str)
@@ -236,15 +287,34 @@ class BatchWorker(EnhancedWorker):
             # 模拟思考阶段
             self.status_changed.emit("深度思考中...")
             
+            # 发送生成查询事件
+            self.event_occurred.emit("generate_query", {
+                "query_list": ["查询1", "查询2", "查询3"]
+            })
+            
             for i in range(20, 60, 5):
                 if self.is_cancelled:
                     return ""
                 self.progress_updated.emit(i, f"思考中... ({i-15}%)")
                 await asyncio.sleep(0.1)
             
+            # 发送网络研究事件
+            self.event_occurred.emit("web_research", {
+                "sources_gathered": [
+                    {"label": "来源1", "content": "内容1"},
+                    {"label": "来源2", "content": "内容2"}
+                ]
+            })
+            
             # 收集所有结果
             result_chunks = []
             self.status_changed.emit("生成完整回复...")
+            
+            # 发送反思事件
+            self.event_occurred.emit("reflection", {
+                "is_sufficient": True,
+                "follow_up_queries": []
+            })
             
             async for chunk in self.naga.process(self.user_input):
                 if self.is_cancelled:
@@ -261,6 +331,9 @@ class BatchWorker(EnhancedWorker):
             if not self.is_cancelled:
                 self.progress_updated.emit(90, "整理回复内容")
                 await asyncio.sleep(0.2)  # 短暂等待，让用户看到进度
+                
+                # 发送生成答案事件
+                self.event_occurred.emit("finalize_answer", {})
                 
                 elapsed = time.time() - start_time
                 self.status_changed.emit(f"思考完成 (用时 {elapsed:.1f}s)")
