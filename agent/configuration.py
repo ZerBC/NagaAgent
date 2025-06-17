@@ -10,19 +10,25 @@ class Configuration(BaseModel):
     支持从环境变量和RunnableConfig中加载配置。
     """
     
+    # API配置
+    api_key: str = Field(
+        default="",
+        description="DeepSeek API密钥"
+    )
+    
     # 模型配置
     query_generator_model: str = Field(
-        default="gemini-2.0-flash",
+        default="deepseek-chat",
         description="用于生成搜索查询的模型名称"
     )
     
     reflection_model: str = Field(
-        default="gemini-2.5-flash-preview-04-17",
+        default="deepseek-chat",
         description="用于反思和评估的模型名称"
     )
     
     answer_model: str = Field(
-        default="gemini-2.5-pro-preview-05-06",
+        default="deepseek-chat",
         description="用于生成最终答案的模型名称"
     )
     

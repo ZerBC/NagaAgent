@@ -1,4 +1,5 @@
 import os
+from config import DEEPSEEK_API_KEY  # 导入API密钥
 
 from agent.tools_and_schemas import SearchQueryList, Reflection
 from dotenv import load_dotenv
@@ -7,7 +8,7 @@ from langgraph.types import Send
 from langgraph.graph import StateGraph
 from langgraph.graph import START, END
 from langchain_core.runnables import RunnableConfig
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_deepseek import ChatDeepSeek
 
 from agent.state import (
     OverallState,
@@ -24,22 +25,19 @@ from agent.prompts import (
     answer_instructions,
 )
 from agent.utils import (
-    get_citations,
-    get_research_topic,
-    insert_citation_markers,
-    resolve_urls,
+    Utils,
 )
 
 load_dotenv()
 
-if os.getenv("GEMINI_API_KEY") is None:
-    raise ValueError("GEMINI_API_KEY is not set")
+# 创建默认配置
+default_config = Configuration(api_key=DEEPSEEK_API_KEY)
 
-# 用于 Google Search API
-genai_client = ChatGoogleGenerativeAI(
-    model="gemini-pro",
+# 用于搜索API的客户端
+genai_client = ChatDeepSeek(
+    model="deepseek-chat",
     temperature=0,
-    google_api_key=os.getenv("GEMINI_API_KEY")
+    api_key=default_config.api_key
 )
 
 # 节点定义
@@ -63,11 +61,11 @@ def generate_query(state: OverallState, config: RunnableConfig) -> QueryGenerati
         state["initial_search_query_count"] = configurable.number_of_initial_queries
 
     # 初始化 Gemini 2.0 Flash
-    llm = ChatGoogleGenerativeAI(
+    llm = ChatDeepSeek(
         model=configurable.query_generator_model,
         temperature=1.0,
         max_retries=2,
-        api_key=os.getenv("GEMINI_API_KEY"),
+        api_key=configurable.api_key or default_config.api_key,
     )
     structured_llm = llm.with_structured_output(SearchQueryList)
 
@@ -75,7 +73,7 @@ def generate_query(state: OverallState, config: RunnableConfig) -> QueryGenerati
     current_date = get_current_date()
     formatted_prompt = query_writer_instructions.format(
         current_date=current_date,
-        research_topic=get_research_topic(state["messages"]),
+        research_topic=Utils.get_research_topic(state["messages"]),
         number_queries=state["initial_search_query_count"],
     )
     # 生成搜索查询
@@ -110,25 +108,25 @@ def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
     configurable = Configuration.from_runnable_config(config)
     formatted_prompt = web_searcher_instructions.format(
         current_date=get_current_date(),
-        research_topic=state["search_query"],
+        research_topic=Utils.get_research_topic(state["messages"]),
     )
 
-    # 使用 google genai client，因为 langchain client 不返回 grounding metadata
+    # 使用deepseek客户端
     response = genai_client.models.generate_content(
         model=configurable.query_generator_model,
         contents=formatted_prompt,
         config={
-            "tools": [{"google_search": {}}],
+            "tools": [{"web_search": {}}],
             "temperature": 0,
         },
     )
     # 将长 url 解析为短 url，节省 token 和时间
-    resolved_urls = resolve_urls(
+    resolved_urls = Utils.resolve_urls(
         response.candidates[0].grounding_metadata.grounding_chunks, state["id"]
     )
     # 获取引用并添加到生成文本中
-    citations = get_citations(response, resolved_urls)
-    modified_text = insert_citation_markers(response.text, citations)
+    citations = Utils.get_citations(response, resolved_urls)
+    modified_text = Utils.insert_citation_markers(response.text, citations)
     sources_gathered = [item for citation in citations for item in citation["segments"]]
 
     return {
@@ -159,15 +157,15 @@ def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
     current_date = get_current_date()
     formatted_prompt = reflection_instructions.format(
         current_date=current_date,
-        research_topic=get_research_topic(state["messages"]),
+        research_topic=Utils.get_research_topic(state["messages"]),
         summaries="\n\n---\n\n".join(state["web_research_result"]),
     )
     # 初始化推理模型
-    llm = ChatGoogleGenerativeAI(
+    llm = ChatDeepSeek(
         model=reasoning_model,
         temperature=1.0,
         max_retries=2,
-        api_key=os.getenv("GEMINI_API_KEY"),
+        api_key=configurable.api_key or default_config.api_key,
     )
     result = llm.with_structured_output(Reflection).invoke(formatted_prompt)
 
@@ -234,16 +232,16 @@ def finalize_answer(state: OverallState, config: RunnableConfig):
     current_date = get_current_date()
     formatted_prompt = answer_instructions.format(
         current_date=current_date,
-        research_topic=get_research_topic(state["messages"]),
+        research_topic=Utils.get_research_topic(state["messages"]),
         summaries="\n---\n\n".join(state["web_research_result"]),
     )
 
     # 初始化推理模型，默认为 Gemini 2.5 Flash
-    llm = ChatGoogleGenerativeAI(
+    llm = ChatDeepSeek(
         model=reasoning_model,
         temperature=0,
         max_retries=2,
-        api_key=os.getenv("GEMINI_API_KEY"),
+        api_key=configurable.api_key or default_config.api_key,
     )
     result = llm.invoke(formatted_prompt)
 
