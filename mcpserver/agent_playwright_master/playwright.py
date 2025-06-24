@@ -89,9 +89,14 @@ class LocalPlaywrightComputer(AsyncComputer):
             if browser is None:
                 return False
             # 尝试获取浏览器的所有页面，如果报错说明已关闭
-            _ = browser.contexts
+            contexts = browser.contexts
+            # 额外检查：尝试获取浏览器版本信息
+            version = browser.version
             return True
-        except Exception:
+        except Exception as e:
+            # 浏览器已关闭或无效，清理全局实例
+            LocalPlaywrightComputer._global_browser = None
+            LocalPlaywrightComputer._global_page = None
             return False
 
     async def _get_browser_and_page(self) -> Tuple[Browser, Page]:
@@ -101,33 +106,74 @@ class LocalPlaywrightComputer(AsyncComputer):
             "--disable-gpu",
             "--no-sandbox"
         ]
-        # 检查浏览器是否活着
+        
+        # 检查浏览器是否活着，如果不存在或已关闭则重新初始化
         if not await LocalPlaywrightComputer.is_browser_alive():
-            # 重新启动
+            # 清理旧的全局实例
+            if LocalPlaywrightComputer._global_browser:
+                try:
+                    await LocalPlaywrightComputer._global_browser.close()
+                except Exception:
+                    pass
+                LocalPlaywrightComputer._global_browser = None
+            
             if LocalPlaywrightComputer._global_playwright:
                 try:
                     await LocalPlaywrightComputer._global_playwright.stop()
                 except Exception:
                     pass
-            LocalPlaywrightComputer._global_playwright = await async_playwright().start()
-            LocalPlaywrightComputer._global_browser = await LocalPlaywrightComputer._global_playwright.chromium.launch(
-                headless=PLAYWRIGHT_HEADLESS,
-                args=launch_args
-            )
+                LocalPlaywrightComputer._global_playwright = None
+            
+            # 重新启动
+            try:
+                LocalPlaywrightComputer._global_playwright = await async_playwright().start()
+                LocalPlaywrightComputer._global_browser = await LocalPlaywrightComputer._global_playwright.chromium.launch(
+                    headless=PLAYWRIGHT_HEADLESS,
+                    args=launch_args
+                )
+                # 验证浏览器实例是否有效
+                if not LocalPlaywrightComputer._global_browser:
+                    raise Exception("浏览器启动失败")
+                # 测试浏览器连接
+                await LocalPlaywrightComputer._global_browser.new_context()
+            except Exception as e:
+                # 清理失败的实例
+                LocalPlaywrightComputer._global_browser = None
+                LocalPlaywrightComputer._global_playwright = None
+                raise Exception(f"浏览器初始化失败: {e}")
+        
+        # 确保全局实例存在
+        if not LocalPlaywrightComputer._global_browser:
+            raise Exception("浏览器实例未正确初始化")
+        
         # 每次都新建分页
-        page = await LocalPlaywrightComputer._global_browser.new_page()
-        await page.set_viewport_size({"width": width, "height": height})
-        return LocalPlaywrightComputer._global_browser, page
+        try:
+            page = await LocalPlaywrightComputer._global_browser.new_page()
+            await page.set_viewport_size({"width": width, "height": height})
+            return LocalPlaywrightComputer._global_browser, page
+        except Exception as e:
+            # 如果new_page失败，可能是浏览器实例已损坏，重新初始化
+            LocalPlaywrightComputer._global_browser = None
+            LocalPlaywrightComputer._global_playwright = None
+            raise Exception(f"创建新页面失败，需要重新初始化浏览器: {e}")
 
     async def __aenter__(self):
         """异步上下文管理器入口，支持实例复用"""
-        try:
-            self._browser, self._page = await self._get_browser_and_page()
-            self._playwright = LocalPlaywrightComputer._global_playwright
-        except Exception as e:
-            sys.stderr.write(f'浏览器实例初始化失败: {e}\n')
-            raise
-        return self
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                self._browser, self._page = await self._get_browser_and_page()
+                self._playwright = LocalPlaywrightComputer._global_playwright
+                return self
+            except Exception as e:
+                sys.stderr.write(f'浏览器实例初始化失败 (尝试 {attempt + 1}/{max_retries}): {e}\n')
+                if attempt == max_retries - 1:
+                    # 最后一次尝试失败，清理全局实例并抛出异常
+                    LocalPlaywrightComputer._global_browser = None
+                    LocalPlaywrightComputer._global_playwright = None
+                    raise Exception(f"浏览器初始化失败，已重试{max_retries}次: {e}")
+                # 等待一段时间后重试
+                await asyncio.sleep(1)
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """异步上下文管理器退出，异常兜底防止资源泄漏"""
@@ -222,13 +268,40 @@ class LocalPlaywrightComputer(AsyncComputer):
             await self.page.mouse.move(px, py)
         await self.page.mouse.up()
 
-    async def open_url(self, url: str) -> str:
+    async def open_url(self, url: str, timeout: int = 30000, wait_until: str = 'domcontentloaded') -> str:
         """打开URL并返回状态"""
         try:
             sys.stderr.write(f'正在打开URL: {url}\n')
-            await self.page.goto(url, wait_until='networkidle')
-            title = await self.page.title()
-            content = await self.page.content()
+            
+            # 设置页面超时
+            self.page.set_default_timeout(timeout)
+            
+            # 尝试导航到URL
+            try:
+                await self.page.goto(url, wait_until=wait_until, timeout=timeout)
+            except Exception as nav_error:
+                # 如果网络空闲超时，尝试只等待DOM加载完成
+                if 'networkidle' in str(nav_error) and wait_until == 'networkidle':
+                    sys.stderr.write(f'网络空闲超时，尝试DOM加载完成模式: {nav_error}\n')
+                    try:
+                        await self.page.goto(url, wait_until='domcontentloaded', timeout=timeout)
+                    except Exception as dom_error:
+                        sys.stderr.write(f'DOM加载也失败: {dom_error}\n')
+                        raise dom_error
+                else:
+                    raise nav_error
+            
+            # 获取页面信息
+            try:
+                title = await self.page.title()
+            except:
+                title = "无法获取标题"
+            
+            try:
+                content = await self.page.content()
+            except:
+                content = ""
+            
             self.context.update(url=url, title=title, content=content)
             return 'ok'
         except Exception as e:
@@ -273,18 +346,44 @@ class PlaywrightAgent(Agent):
             sys.stderr.write(f'收到handoff请求数据: {data_json}\n'.encode('utf-8', errors='replace').decode('utf-8'))
             if not isinstance(data, dict):
                 raise ValueError(f"无效的数据格式: {type(data)}")
+            
+            action = data.get("action", "")
             url = data.get("url")
             query = data.get("query")
-            action = data.get("action", "")
             selector = data.get("selector")
             text = data.get("text")
-            # 支持action=open，直接打开url
-            if action == "open" and url:
+            timeout = int(data.get("timeout", 30000))
+            wait_until = data.get("wait_until", "domcontentloaded")
+            
+            # 处理特殊action
+            if action == "reboot_browser":
+                # 重启浏览器
+                try:
+                    if LocalPlaywrightComputer._global_browser:
+                        await LocalPlaywrightComputer._global_browser.close()
+                    if LocalPlaywrightComputer._global_playwright:
+                        await LocalPlaywrightComputer._global_playwright.stop()
+                    LocalPlaywrightComputer._global_browser = None
+                    LocalPlaywrightComputer._global_playwright = None
+                    return json.dumps({
+                        'status': 'ok',
+                        'message': '浏览器已重启',
+                        'data': {}
+                    }, ensure_ascii=False)
+                except Exception as e:
+                    return json.dumps({
+                        'status': 'error',
+                        'message': f'重启浏览器失败: {e}',
+                        'data': {}
+                    }, ensure_ascii=False)
+            
+            # 支持action=open或action=open_browser，直接打开url
+            if action in ["open", "open_browser"] and url:
                 if not url.startswith(('http://', 'https://')):
                     url = 'https://' + url
                 sys.stderr.write(f'直接打开URL: {url}\n')
                 async with LocalPlaywrightComputer() as computer:
-                    result = await computer.open_url(url)
+                    result = await computer.open_url(url, timeout=timeout, wait_until=wait_until)
                     response = {
                         'status': 'ok' if result == 'ok' else 'error',
                         'message': result if result != 'ok' else '打开成功',
@@ -296,6 +395,7 @@ class PlaywrightAgent(Agent):
                         }
                     }
                 return json.dumps(response, ensure_ascii=False)
+            
             # 支持action=type，优先selector输入
             if action == "type" and selector and text is not None:
                 async with LocalPlaywrightComputer() as computer:
@@ -310,6 +410,7 @@ class PlaywrightAgent(Agent):
                         }
                     }
                 return json.dumps(response, ensure_ascii=False)
+            
             # 支持action=click，优先selector点击
             if action == "click" and selector:
                 async with LocalPlaywrightComputer() as computer:
@@ -323,6 +424,7 @@ class PlaywrightAgent(Agent):
                         }
                     }
                 return json.dumps(response, ensure_ascii=False)
+            
             # 兼容原有url/query/搜索逻辑
             # 优先url
             if url:
@@ -330,7 +432,7 @@ class PlaywrightAgent(Agent):
                     url = 'https://' + url
                 sys.stderr.write(f'直接打开URL: {url}\n')
                 async with LocalPlaywrightComputer() as computer:
-                    result = await computer.open_url(url)
+                    result = await computer.open_url(url, timeout=timeout, wait_until=wait_until)
                     response = {
                         'status': 'ok' if result == 'ok' else 'error',
                         'message': result if result != 'ok' else '打开成功',
@@ -342,6 +444,7 @@ class PlaywrightAgent(Agent):
                         }
                     }
                 return json.dumps(response, ensure_ascii=False)
+            
             # 其次query
             if query:
                 # 判断是否为网址
@@ -351,7 +454,7 @@ class PlaywrightAgent(Agent):
                         url2 = 'https://' + url2
                     sys.stderr.write(f'query被识别为网址，自动打开: {url2}\n'.encode('utf-8', errors='replace').decode('utf-8'))
                     async with LocalPlaywrightComputer() as computer:
-                        result = await computer.open_url(url2)
+                        result = await computer.open_url(url2, timeout=timeout, wait_until=wait_until)
                         response = {
                             'status': 'ok' if result == 'ok' else 'error',
                             'message': result if result != 'ok' else '打开成功',
@@ -376,17 +479,18 @@ class PlaywrightAgent(Agent):
                     if url3:
                         sys.stderr.write(f'自动打开搜索第一个结果: {url3}\n'.encode('utf-8', errors='replace').decode('utf-8'))
                         async with LocalPlaywrightComputer() as computer:
-                            result = await computer.open_url(url3)
+                            result = await computer.open_url(url3, timeout=timeout, wait_until=wait_until)
                             if result == 'ok':
                                 search_result["data"]["opened_url"] = url3
                                 search_result["data"]["page_title"] = computer.context.page_title
                                 search_result["data"]["page_content_length"] = len(computer.context.page_content)
                 search_result["query"] = query
                 return json.dumps(search_result, ensure_ascii=False)
+            
             # 兜底
             return json.dumps({
                 'status': 'error',
-                'message': '未提供url或query',
+                'message': '未提供有效的url、query或action',
                 'data': {}
             }, ensure_ascii=False)
         except Exception as e:

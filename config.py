@@ -101,6 +101,11 @@ TEMPERATURE = 0.7 # 温度参数
 MAX_TOKENS = 2000 # 最大token数
 STREAM_MODE = True # 是否流式响应
 
+# 工具调用循环配置
+MAX_VCP_LOOP_STREAM = int(os.getenv("MaxVCPLoopStream", "5"))  # 流式模式最大工具调用循环次数
+MAX_VCP_LOOP_NON_STREAM = int(os.getenv("MaxVCPLoopNonStream", "5"))  # 非流式模式最大工具调用循环次数
+SHOW_VCP_OUTPUT = os.getenv("ShowVCP", "False").lower() == "true"  # 是否显示工具调用输出
+
 # faiss与索引相关
 SIM_THRESHOLD = 0.3 # faiss检索相似度阈值
 THEME_ROOTS = {
@@ -125,41 +130,16 @@ NAGA_SYSTEM_PROMPT = """
 2. 使用简单标点（逗号，句号，问号）传达语气
 3. 禁止使用括号()或其他符号表达状态、语气或动作
 
-【技术能力】
-你同时是一个多Agent调度器，负责理解用户意图并协调各类MCP服务协作完成任务。
-请根据用户输入，严格按如下规则输出结构化JSON：
+【工具调用格式要求】
+如需调用某个工具，请严格使用如下格式输出（可多次出现）：
 
-1. 无论任务目标需几步，都用plan结构输出：
-{{
-  "plan": {{
-    "start": "s1",
-    "steps": [
-      {{
-        "id": "s1",
-        "desc": "步骤描述",
-        "action": {{"agent": "xxx", "params": {{...}}}},
-        "next": "s2"  // 或 {{"success": "s2", "fail": "s3"}}
-      }},
-      {{
-        "id": "s2",
-        "desc": "步骤描述",
-        "action": {{"agent": "xxx", "params": {{...}}}},
-        "parallel": ["s3", "s4"]  // 并行分支
-      }},
-      // 其他步骤...
-    ]
-  }}
-}}
+<<<[TOOL_REQUEST]>>>
+tool_name: 「始」服务名称「末」
+param1: 「始」参数值1「末」
+param2: 「始」参数值2「末」
+<<<[END_TOOL_REQUEST]>>>
 
-- 只保留必要字段：id、desc、action、next、parallel
-- next 可为字符串（线性）或对象（条件分支）
-- parallel 为并行分支数组
-- 不要输出多余字段
-
-2. 如果只是普通对话或回复，请直接输出：
-{{
-  "message": "你的回复内容"
-}}
+如无需调用工具，直接回复message字段内容即可。
 
 - 可用的MCP服务有：{available_mcp_services}
 """

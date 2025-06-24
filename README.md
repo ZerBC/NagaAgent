@@ -85,6 +85,7 @@
 python check_env.py
 ```
 
+---
 
 ## ⚙️ 配置说明
 
@@ -115,8 +116,8 @@ API_SERVER_AUTO_START = True  # 启动时自动启动API服务器
 - **RESTful API接口**，自动启动HTTP服务器，支持完整对话功能和流式输出，可集成到任何前端或服务
 - DeepSeek流式对话，支持上下文召回与主题树分片检索
 - faiss向量数据库，HNSW+PQ混合索引，异步加速，动态调整深度，权重动态调整，自动清理
-- MCP服务集成，Agent Handoff智能分发，支持自定义过滤器与回调
-- **多Agent能力扩展：浏览器、文件、代码等多种Agent即插即用，所有Agent均可通过handoff机制统一调用**
+- **TOOL_REQUEST工具调用循环**，自动解析和执行LLM返回的工具调用，支持多轮递归调用
+- **多Agent能力扩展：浏览器、文件、代码等多种Agent即插即用，所有Agent均可通过工具调用循环机制统一调用**
 - **跨平台兼容：Windows/Mac自动适配，浏览器路径自动检测，依赖智能安装**
 - 代码极简，注释全中文，组件解耦，便于扩展
 - PyQt5动画与UI，支持PNG序列帧，loading动画极快
@@ -124,7 +125,7 @@ API_SERVER_AUTO_START = True  # 启动时自动启动API服务器
 - 记忆权重动态调整，支持AI/人工标记important，权重/阈值/清理策略全部在`config.py`统一管理
 - **所有前端UI与后端解耦，前端只需解析后端JSON，自动适配message/data.content等多种返回结构**
 - **前端换行符自动适配，无论后端返回`\n`还是`\\n`，PyQt界面都能正确分行显示**
-- **所有Agent的handoff schema和注册元数据已集中在`mcpserver/mcp_registry.py`，主流程和管理器极简，扩展维护更方便。只需维护一处即可批量注册/扩展所有Agent服务。**
+- **所有Agent的注册元数据已集中在`mcpserver/mcp_registry.py`，主流程和管理器极简，扩展维护更方便。只需维护一处即可批量注册/扩展所有Agent服务。**
 - **自动注册/热插拔Agent机制，新增/删除Agent只需增删py文件，无需重启主程序**
 - 聊天窗口支持**Markdown语法**，包括标题、粗体、斜体、代码块、表格、图片等。
 
@@ -135,9 +136,18 @@ API_SERVER_AUTO_START = True  # 启动时自动启动API服务器
 NagaAgent/
 ├── main.py                     # 主入口
 ├── config.py                   # 全局配置
-├── api_server.py               # RESTful API服务器
-├── conversation_core.py        # 对话核心（含兼容模式主逻辑）
-├── handoff_executor.py         # 任务流调度器，自动解析plan并执行多步/分支/并行任务
+├── conversation_core.py        # 对话核心（含工具调用循环主逻辑）
+├── apiserver/                  # API服务器模块
+│   ├── api_server.py           # FastAPI服务器
+│   ├── start_server.py         # 启动脚本
+│   └── README.md               # API文档
+├── agent/                      # 预处理系统模块
+│   ├── preprocessor.py         # 消息预处理
+│   ├── plugin_manager.py       # 插件管理
+│   ├── api_server.py           # 代理API服务器
+│   ├── image_processor.py      # 图片处理
+│   ├── start_server.py         # 启动脚本
+│   └── README.md               # 预处理系统文档
 ├── mcpserver/
 │   ├── mcp_manager.py          # MCP服务管理
 │   ├── mcp_registry.py         # Agent注册与schema元数据
@@ -174,9 +184,60 @@ NagaAgent/
 
 ---
 
+## 🔧 工具调用循环机制
+
+### TOOL_REQUEST格式
+系统仅支持如下格式的工具调用：
+
+```
+<<<[TOOL_REQUEST]>>>
+tool_name: 「始」服务名称「末」
+param1: 「始」参数值1「末」
+param2: 「始」参数值2「末」
+<<<[END_TOOL_REQUEST]>>>
+```
+
+### 工具调用流程
+1. **LLM输出TOOL_REQUEST格式**：LLM根据用户需求输出工具调用请求
+2. **自动解析工具调用**：系统自动解析TOOL_REQUEST块，提取工具名称和参数
+3. **执行工具调用**：调用对应的MCP服务执行具体任务
+4. **结果返回LLM**：将工具执行结果返回给LLM
+5. **循环处理**：重复步骤2-4，直到LLM输出普通文本或无工具调用
+
+### 配置参数
+```python
+# config.py中的工具调用循环配置
+MAX_VCP_LOOP_STREAM = 5      # 流式模式最大工具调用循环次数
+MAX_VCP_LOOP_NON_STREAM = 5  # 非流式模式最大工具调用循环次数
+SHOW_VCP_OUTPUT = False      # 是否显示工具调用输出
+```
+
+### 使用示例
+```python
+# 浏览器操作
+await mcp.handoff(
+    service_name="playwright",
+    task={"action": "open_browser", "url": "https://www.bilibili.com"}
+)
+
+# 文件操作
+await mcp.handoff(
+    service_name="file",
+    task={"action": "read", "path": "test.txt"}
+)
+
+# 代码执行
+await mcp.handoff(
+    service_name="coder",
+    task={"action": "run", "file": "main.py"}
+)
+```
+
+---
+
 ## 🌐 多Agent与MCP服务
 - **所有Agent的注册、schema、描述均集中在`mcpserver/mcp_registry.py`，批量管理，极简扩展**
-- 支持浏览器、文件、代码等多种Agent，全部可通过handoff机制统一调用
+- 支持浏览器、文件、代码等多种Agent，全部可通过工具调用循环机制统一调用
 - Agent能力即插即用，自动注册/热插拔，无需重启主程序
 - 典型用法示例：
 
@@ -215,7 +276,7 @@ await s.mcp.handoff(
 - 检索日志自动记录，参数可调，faiss配置示例见`config.py`
 - 聊天窗口背景透明度、用户名、主题树召回、流式输出、侧栏动画等全部可自定义
 - 支持历史对话一键导入AI多层记忆系统，兼容主题、分层、embedding等所有新特性
-- 多Agent分步流水线自动执行机制，支持plan结构自动解析与多步执行
+- **工具调用循环自动执行机制，支持多轮递归调用，最大循环次数可配置**
 
 ---
 
@@ -261,10 +322,15 @@ await s.mcp.handoff(
 - 依赖缺失：确保安装了FastAPI和Uvicorn `pip install fastapi uvicorn[standard]`
 - 无法访问：检查防火墙设置，确保端口未被阻塞
 
+### 工具调用问题
+- 工具调用循环次数过多：调整`config.py`中的`MAX_VCP_LOOP_STREAM`和`MAX_VCP_LOOP_NON_STREAM`
+- 工具调用失败：检查MCP服务是否正常运行，查看日志输出
+- 格式错误：确保LLM输出严格遵循TOOL_REQUEST格式
+
 ### 通用问题
 - 浏览器无法启动，检查playwright安装与网络
 - 主题树/索引/参数/密钥全部在`config.py`统一管理
-- 聊天输入`#devmode`进入开发者模式，后续对话不写入faiss，仅用于MCP测试
+- 聊天输入`#devmode`进入开发者模式，后续对话不写入faiss，仅用于工具调用测试
 
 ---
 
@@ -301,66 +367,51 @@ MIT License
 - 点击侧栏即可切换立绘展开/收起，主聊天区和输入框会自动让位并隐藏/恢复。
 - 动画时长、缓动曲线等可根据需要调整源码参数。
 
-## 多Agent分步流水线自动执行机制
+## 工具调用循环机制详解
 
-系统支持LLM输出plan结构时自动解析并依次执行每一步：
-- 每步可包含action结构，指明agent和params参数
-- 支持每步用id唯一标识，next可为字符串（线性）、对象（条件分支），parallel为并行分支数组
-- 系统自动解析plan为任务图，支持链式、条件跳转、分支、并行等任意流程
-- 每步执行结果实时反馈，全部完成后汇总
-- 其它无action的步骤仅输出描述，不自动执行
+### 核心特性
+- **自动解析**：系统自动解析LLM返回的TOOL_REQUEST格式工具调用
+- **递归执行**：支持多轮工具调用循环，最大循环次数可配置
+- **错误处理**：完善的错误处理和回退机制
+- **流式支持**：支持流式和非流式两种模式
 
-**精简plan结构示例：**
-```json
-{
-  "plan": {
-    "start": "s1",
-    "steps": [
-      {
-        "id": "s1",
-        "desc": "读取文件",
-        "action": {"agent": "file", "params": {"action": "read", "path": "test.txt"}},
-        "next": {"success": "s2", "fail": "s3"}
-      },
-      {
-        "id": "s2",
-        "desc": "写入文件",
-        "action": {"agent": "file", "params": {"action": "write", "path": "out.txt"}},
-        "next": "s4"
-      },
-      {
-        "id": "s3",
-        "desc": "失败通知",
-        "action": {"agent": "notify", "params": {"msg": "失败"}}
-      },
-      {
-        "id": "s4",
-        "desc": "并行处理",
-        "parallel": ["s5", "s6"]
-      },
-      {
-        "id": "s5",
-        "desc": "分支A",
-        "action": {"agent": "A", "params": {}}
-      },
-      {
-        "id": "s6",
-        "desc": "分支B",
-        "action": {"agent": "B", "params": {}}
-      }
-    ]
-  }
-}
+### 工具调用格式
+LLM必须严格按照以下格式输出工具调用：
+
+```
+<<<[TOOL_REQUEST]>>>
+tool_name: 「始」服务名称「末」
+param1: 「始」参数值1「末」
+param2: 「始」参数值2「末」
+<<<[END_TOOL_REQUEST]>>>
 ```
 
-- 只保留必要字段：id、desc、action、next、parallel
-- next可为字符串（线性）或对象（条件分支）
-- parallel为并行分支数组
-- 不要输出多余字段
+### 执行流程
+1. **接收用户消息**
+2. **调用LLM API**
+3. **解析TOOL_REQUEST格式工具调用**
+4. **执行工具调用（通过MCP服务）**
+5. **将结果返回给LLM**
+6. **重复步骤2-5直到无工具调用或达到最大循环次数**
 
-**系统会自动解析plan为任务图，支持链式、分支、并行等复杂流程，兼容原有线性plan。**
+### 配置参数
+```python
+# config.py中的工具调用循环配置
+MAX_VCP_LOOP_STREAM = 5      # 流式模式最大工具调用循环次数
+MAX_VCP_LOOP_NON_STREAM = 5  # 非流式模式最大工具调用循环次数
+SHOW_VCP_OUTPUT = False      # 是否显示工具调用输出
+```
 
-如需自定义Agent或扩展plan协议，请参考`mcpserver/agent_xxx/`和`mcp_registry.py`。
+### 错误处理
+- 工具调用失败时会记录错误信息并继续执行
+- 达到最大循环次数时会停止
+- 支持回退到原始处理方式
+
+### 扩展开发
+如需添加新的工具调用处理逻辑，可以：
+1. 在`mcpserver/`目录下添加新的Agent
+2. 在`mcpserver/mcp_registry.py`中注册新Agent
+3. 更新API接口以支持新的功能
 
 ---
 
@@ -438,72 +489,6 @@ curl -X POST "http://127.0.0.1:8000/chat/stream" \
      --no-buffer
 ```
 
-#### Python客户端
-```python
-import requests
-
-# 基本对话
-response = requests.post(
-    "http://127.0.0.1:8000/chat",
-    json={"message": "你好，娜迦"}
-)
-result = response.json()
-print(result['response'])
-
-# 流式对话
-response = requests.post(
-    "http://127.0.0.1:8000/chat/stream",
-    json={"message": "请介绍一下机器学习"},
-    stream=True
-)
-
-for line in response.iter_lines():
-    if line and line.startswith(b'data: '):
-        import json
-        data = json.loads(line[6:])
-        if 'content' in data:
-            print(data['content'], end='')
-```
-
-#### JavaScript/Node.js客户端
-```javascript
-// 基本对话
-const response = await fetch('http://127.0.0.1:8000/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: '你好，娜迦' })
-});
-const result = await response.json();
-console.log(result.response);
-
-// 流式对话
-const streamResponse = await fetch('http://127.0.0.1:8000/chat/stream', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: '请介绍一下人工智能' })
-});
-
-const reader = streamResponse.body.getReader();
-const decoder = new TextDecoder();
-
-while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    
-    const chunk = decoder.decode(value);
-    const lines = chunk.split('\n');
-    
-    for (const line of lines) {
-        if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.slice(6));
-            if (data.content) {
-                process.stdout.write(data.content);
-            }
-        }
-    }
-}
-```
-
 ### API错误处理
 
 API使用标准HTTP状态码：
@@ -550,14 +535,6 @@ curl http://127.0.0.1:8000/health
   ```json
   {"action": "open", "app": "微信"}
   ```
-- 打开WPS Office：
-  ```json
-  {"action": "open", "app": "WPS Office"}
-  ```
-- 打开网易云音乐：
-  ```json
-  {"action": "open", "app": "网易云音乐"}
-  ```
 - 列出所有可用应用：
   ```json
   {"action": "list"}
@@ -577,3 +554,25 @@ curl http://127.0.0.1:8000/health
 - 新安装应用后请先`refresh`再`open`。
 - Windows下建议将常用应用快捷方式放到开始菜单，便于自动识别。
 - 仅支持明确的action（open/list/refresh），其他操作会被拒绝。
+
+## 工具调用机制
+
+本系统仅支持如下格式的工具调用循环：
+
+```
+<<<[TOOL_REQUEST]>>>
+tool_name: 「始」服务名称「末」
+param1: 「始」参数值1「末」
+param2: 「始」参数值2「末」
+<<<[END_TOOL_REQUEST]>>>
+```
+
+如无需调用工具，直接回复message字段内容即可。
+
+- LLM每次输出可包含多个TOOL_REQUEST块，系统会自动循环解析和执行，直到无工具调用为止。
+- 不再支持plan结构的多步分解，所有多步任务请LLM分多轮TOOL_REQUEST实现。
+
+## 主要功能
+- 智能对话与工具调用循环
+- 插件化消息预处理与图片处理
+- API代理与MCP服务集成 

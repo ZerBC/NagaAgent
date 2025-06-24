@@ -4,47 +4,9 @@
 """
 
 import os
-from PyQt5.QtWidgets import (QWidget, QLabel, QProgressBar, QVBoxLayout, QHBoxLayout, 
-                           QScrollArea, QFrame)
+from PyQt5.QtWidgets import QWidget, QLabel, QProgressBar, QVBoxLayout, QHBoxLayout
 from PyQt5.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, pyqtSignal
-from PyQt5.QtGui import QFont, QPixmap, QMovie, QColor, QPainter, QPen
-
-class ActivityItem(QFrame):
-    """单个活动项组件"""
-    def __init__(self, title, data, parent=None):
-        super().__init__(parent)
-        self.setStyleSheet("""
-            QFrame {
-                background: rgba(17,17,17,150);
-                border-radius: 10px;
-                border: 1px solid rgba(255, 255, 255, 30);
-            }
-        """)
-        
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 5, 10, 5)
-        
-        # 标题
-        title_label = QLabel(title)
-        title_label.setStyleSheet("""
-            QLabel {
-                color: #fff;
-                font-size: 12px;
-                font-weight: bold;
-            }
-        """)
-        layout.addWidget(title_label)
-        
-        # 数据
-        data_label = QLabel(str(data))
-        data_label.setStyleSheet("""
-            QLabel {
-                color: #ccc;
-                font-size: 11px;
-            }
-        """)
-        data_label.setWordWrap(True)
-        layout.addWidget(data_label)
+from PyQt5.QtGui import QFont, QPixmap, QMovie
 
 class ProgressWidget(QWidget):
     """进度显示组件"""
@@ -215,40 +177,6 @@ class EnhancedProgressWidget(ProgressWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.add_cancel_button()
-        self.activities = []  # 存储活动列表
-        
-        # 添加活动列表容器
-        self.activities_container = QWidget()
-        self.activities_layout = QVBoxLayout(self.activities_container)
-        self.activities_layout.setContentsMargins(0, 0, 0, 0)
-        self.activities_layout.setSpacing(5)
-        
-        # 创建滚动区域
-        self.scroll_area = QScrollArea()
-        self.scroll_area.setWidget(self.activities_container)
-        self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setStyleSheet("""
-            QScrollArea {
-                background: transparent;
-                border: none;
-            }
-            QScrollBar:vertical {
-                background: rgba(255, 255, 255, 20);
-                width: 6px;
-                border-radius: 3px;
-            }
-            QScrollBar::handle:vertical {
-                background: rgba(255, 255, 255, 60);
-                border-radius: 3px;
-                min-height: 20px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background: rgba(255, 255, 255, 80);
-            }
-        """)
-        
-        # 将滚动区域添加到主布局
-        self.layout().addWidget(self.scroll_area)
         
     def add_cancel_button(self):
         """添加取消按钮"""
@@ -287,7 +215,6 @@ class EnhancedProgressWidget(ProgressWidget):
         # 确保显示状态
         self.show()
         self.setWindowOpacity(1.0)
-        self.clear_activities()
         
     def set_generating_mode(self):
         """设置生成模式"""
@@ -305,65 +232,4 @@ class EnhancedProgressWidget(ProgressWidget):
         if show_cancel:
             self.cancel_btn.show()
         else:
-            self.cancel_btn.hide()
-        
-    def add_activity(self, title, data):
-        """添加新的活动项"""
-        activity = ActivityItem(title, data)
-        self.activities.append(activity)
-        self.activities_layout.addWidget(activity)
-        self.scroll_to_bottom()
-        
-    def clear_activities(self):
-        """清除所有活动"""
-        for activity in self.activities:
-            activity.deleteLater()
-        self.activities.clear()
-        
-    def scroll_to_bottom(self):
-        """滚动到底部"""
-        self.scroll_area.verticalScrollBar().setValue(
-            self.scroll_area.verticalScrollBar().maximum()
-        )
-        
-    def stop_loading(self):
-        """停止加载状态"""
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(100)
-        self.status_label.setText("完成")
-        # 3秒后隐藏
-        QTimer.singleShot(3000, self.hide)
-        
-    def update_progress(self, value, status=None):
-        """更新进度"""
-        super().update_progress(value, status)
-        
-    def handle_event(self, event_type, data):
-        """处理事件"""
-        if event_type == "generate_query":
-            # 生成查询事件
-            queries = data.get("query_list", [])
-            self.add_activity("生成搜索查询", f"生成了 {len(queries)} 个查询")
-            for i, query in enumerate(queries, 1):
-                self.add_activity(f"查询 {i}", query)
-                
-        elif event_type == "web_research":
-            # 网络研究事件
-            sources = data.get("sources_gathered", [])
-            self.add_activity("网络研究", f"收集了 {len(sources)} 个来源")
-            for source in sources:
-                self.add_activity("来源", f"{source.get('label', '未知')}: {source.get('content', '')[:100]}...")
-                
-        elif event_type == "reflection":
-            # 反思事件
-            if data.get("is_sufficient"):
-                self.add_activity("反思", "搜索成功，生成最终答案")
-            else:
-                follow_up = data.get("follow_up_queries", [])
-                self.add_activity("反思", f"需要更多信息，生成 {len(follow_up)} 个后续查询")
-                for i, query in enumerate(follow_up, 1):
-                    self.add_activity(f"后续查询 {i}", query)
-                    
-        elif event_type == "finalize_answer":
-            # 生成最终答案事件
-            self.add_activity("完成答案", "正在生成最终答案") 
+            self.cancel_btn.hide() 

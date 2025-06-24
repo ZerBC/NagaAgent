@@ -1,3 +1,6 @@
-from agent.graph import graph
+# agent/__init__.py
+# Agent包初始化文件
 
-__all__ = ["graph"]
+from .preprocessor import AgentPreprocessor, get_preprocessor, preprocess_messages
+
+__all__ = ['AgentPreprocessor', 'get_preprocessor', 'preprocess_messages'] 

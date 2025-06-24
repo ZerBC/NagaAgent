@@ -129,7 +129,9 @@ threading.Thread(target=loop.run_forever,daemon=True).start()
 
 class NagaAgentAdapter:
  def __init__(s):s.naga=NagaConversation()
- async def respond_stream(s,txt):resp=await s.naga.process(txt);yield "娜迦",resp,None,True,False
+ async def respond_stream(s,txt):
+     async for resp in s.naga.process(txt):
+         yield "娜迦",resp,None,True,False
 
 if __name__=="__main__":
  app=QApplication(sys.argv)

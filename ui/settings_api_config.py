@@ -32,24 +32,16 @@ def write_api_key(new_key):
         env_lines.append(f'DEEPSEEK_API_KEY={new_key}\n')
     with open(env_path, 'w', encoding='utf-8') as f:
         f.writelines(env_lines)
-    # 写入config.py，确保只保留一行DEEPSEEK_API_KEY
+    # 写入config.py
     config_path = os.path.join(os.path.dirname(config.__file__), 'config.py')
     with open(config_path, 'r', encoding='utf-8') as f:
         lines = f.readlines()
-    new_lines = []
-    replaced = False
-    for line in lines:
+    for i, line in enumerate(lines):
         if line.strip().startswith('DEEPSEEK_API_KEY'):
-            if not replaced:
-                new_lines.append(f"DEEPSEEK_API_KEY = '{new_key}'\n")
-                replaced = True
-            # 跳过多余的DEEPSEEK_API_KEY行
-        else:
-            new_lines.append(line)
-    if not replaced:
-        new_lines.append(f"DEEPSEEK_API_KEY = '{new_key}'\n")
+            lines[i] = f"DEEPSEEK_API_KEY = '{new_key}'\n"
+            break
     with open(config_path, 'w', encoding='utf-8') as f:
-        f.writelines(new_lines)
+        f.writelines(lines)
 
 class ApiConfigWidget(QWidget):
     def __init__(s, parent=None):

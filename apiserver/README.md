@@ -1,46 +1,217 @@
 # NagaAgent API服务器
 
-这个文件夹包含NagaAgent的API服务器相关文件。
+NagaAgent的RESTful API服务器，提供智能对话、MCP服务调用等功能。
 
-## 文件说明
+## 🚀 功能特性
 
-- `api_server.py` - 主要的FastAPI服务器代码
-- `start_server.py` - 独立启动脚本
-- `__init__.py` - Python包初始化文件
+### 核心功能
+- **智能对话**: 支持普通对话和流式对话
+- **工具调用循环**: 自动解析和执行LLM返回的工具调用
+- **MCP服务集成**: 支持多种MCP服务的调用
+- **记忆系统**: 集成记忆管理功能
+- **开发者模式**: 支持开发者模式切换
 
-## 使用方式
+### 工具调用循环
+- **自动解析**: 自动解析LLM返回的`<<<[TOOL_REQUEST]>>>`格式工具调用
+- **递归执行**: 支持多轮工具调用循环，最大循环次数可配置
+- **错误处理**: 完善的错误处理和回退机制
+- **流式支持**: 支持流式和非流式两种模式
 
-### 1. 通过main.py自动启动（推荐）
-```bash
-python main.py
+## 📋 API接口
+
+### 基础接口
+
+#### GET `/`
+- **描述**: API根路径
+- **返回**: 服务器基本信息
+
+#### GET `/health`
+- **描述**: 健康检查
+- **返回**: 服务器状态信息
+
+#### GET `/system/info`
+- **描述**: 获取系统信息
+- **返回**: 版本、状态、可用服务等
+
+### 对话接口
+
+#### POST `/chat`
+- **描述**: 普通对话接口
+- **请求体**:
+  ```json
+  {
+    "message": "用户消息",
+    "stream": false,
+    "session_id": "会话ID（可选）"
+  }
+  ```
+- **返回**:
+  ```json
+  {
+    "response": "AI回复",
+    "session_id": "会话ID",
+    "status": "success"
+  }
+  ```
+
+#### POST `/chat/stream`
+- **描述**: 流式对话接口
+- **请求体**: 同普通对话
+- **返回**: Server-Sent Events格式的流式响应
+
+### MCP服务接口
+
+#### POST `/mcp/handoff`
+- **描述**: MCP服务调用
+- **请求体**:
+  ```json
+  {
+    "service_name": "服务名称",
+    "task": {
+      "action": "操作",
+      "params": {}
+    },
+    "session_id": "会话ID（可选）"
+  }
+  ```
+
+#### GET `/mcp/services`
+- **描述**: 获取可用MCP服务列表
+
+### 系统管理接口
+
+#### POST `/system/devmode`
+- **描述**: 切换开发者模式
+
+#### GET `/memory/stats`
+- **描述**: 获取记忆系统统计信息
+
+## ⚙️ 配置
+
+### 环境变量
+
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
+| `API_SERVER_HOST` | `127.0.0.1` | API服务器主机地址 |
+| `API_SERVER_PORT` | `8000` | API服务器端口 |
+| `API_SERVER_RELOAD` | `False` | 是否开启自动重载 |
+| `MaxVCPLoopStream` | `5` | 流式模式最大工具调用循环次数 |
+| `MaxVCPLoopNonStream` | `5` | 非流式模式最大工具调用循环次数 |
+| `ShowVCP` | `False` | 是否显示工具调用输出 |
+
+### 工具调用格式
+
+LLM返回的工具调用应使用以下格式：
+
 ```
-API服务器会在系统启动时自动启动在端口8000。
-
-### 2. 独立启动API服务器
-```bash
-cd apiserver
-python start_server.py
+<<<[TOOL_REQUEST]>>>
+tool_name: 「始」服务名称「末」
+param1: 「始」参数值1「末」
+param2: 「始」参数值2「末」
+<<<[END_TOOL_REQUEST]>>>
 ```
 
-### 3. 自定义端口启动
+## 🚀 启动方式
+
+### 方式1: 直接启动
 ```bash
-cd apiserver
-python start_server.py --host 0.0.0.0 --port 8080
+python apiserver/start_server.py
 ```
 
-### 4. 开发模式（自动重载）
+### 方式2: 使用uvicorn
 ```bash
-cd apiserver
-python start_server.py --reload --log-level debug
+uvicorn apiserver.api_server:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-## API接口
+### 方式3: 环境变量配置
+```bash
+export API_SERVER_HOST=0.0.0.0
+export API_SERVER_PORT=8080
+export API_SERVER_RELOAD=True
+python apiserver/start_server.py
+```
 
-启动后可以访问：
-- API文档: http://127.0.0.1:8000/docs
-- 健康检查: http://127.0.0.1:8000/health
-- 对话接口: http://127.0.0.1:8000/chat
-- 流式对话: http://127.0.0.1:8000/chat/stream
+## 📖 使用示例
+
+### Python客户端示例
+
+```python
+import requests
+import json
+
+# 普通对话
+response = requests.post("http://127.0.0.1:8000/chat", json={
+    "message": "你好，请帮我查询今天的天气",
+    "stream": False
+})
+print(response.json())
+
+# 流式对话
+response = requests.post("http://127.0.0.1:8000/chat/stream", json={
+    "message": "请帮我分析这张图片",
+    "stream": True
+}, stream=True)
+
+for line in response.iter_lines():
+    if line:
+        data = line.decode('utf-8')
+        if data.startswith('data: '):
+            try:
+                json_data = json.loads(data[6:])
+                print(json_data)
+            except:
+                pass
+```
+
+### MCP服务调用示例
+
+```python
+import requests
+
+# 调用天气服务
+response = requests.post("http://127.0.0.1:8000/mcp/handoff", json={
+    "service_name": "WeatherAgent",
+    "task": {
+        "action": "get_weather",
+        "params": {
+            "city": "北京"
+        }
+    }
+})
+print(response.json())
+```
+
+## 🔧 开发说明
+
+### 工具调用循环流程
+
+1. **接收用户消息**
+2. **调用LLM API**
+3. **解析工具调用**
+4. **执行工具调用**
+5. **将结果返回给LLM**
+6. **重复步骤2-5直到无工具调用或达到最大循环次数**
+
+### 错误处理
+
+- 工具调用失败时会记录错误信息
+- 达到最大循环次数时会停止
+- 支持回退到原始处理方式
+
+### 扩展开发
+
+如需添加新的工具调用处理逻辑，可以：
+
+1. 修改`ToolCallProcessor`类
+2. 在`conversation_core.py`中添加新的处理逻辑
+3. 更新API接口以支持新的功能
+
+## 📝 注意事项
+
+1. 确保MCP服务已正确配置和启动
+2. 工具调用循环次数不宜设置过大，避免无限循环
+3. 流式模式下工具调用循环会暂时关闭流式输出
+4. 开发者模式下不会保存对话日志到向量库
 
 ## 代理问题
 

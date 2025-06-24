@@ -8,18 +8,21 @@ import asyncio
 import json
 import sys
 import traceback
+import re
+import os
 from contextlib import asynccontextmanager
 from typing import Dict, List, Optional, AsyncGenerator
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+import aiohttp
 
 # 导入NagaAgent核心模块
 from conversation_core import NagaConversation
-from config import DEEPSEEK_API_KEY
+from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL, TEMPERATURE, MAX_TOKENS
 from ui.response_utils import extract_message  # 导入消息提取工具
 
 # 全局NagaAgent实例
@@ -128,15 +131,43 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=400, detail="消息内容不能为空")
     
     try:
-        response_text = ""
-        async for speaker, content in naga_agent.process(request.message):
-            if speaker == "娜迦":
-                # 使用extract_message提取纯文本
-                raw_content = str(content)
-                extracted_content = extract_message(raw_content)
-                print(f"[DEBUG] 原始内容: {repr(raw_content[:100])}")
-                print(f"[DEBUG] 提取内容: {repr(extracted_content[:100])}")
-                response_text += extracted_content
+        # 构建消息
+        messages = [
+            {"role": "user", "content": request.message}
+        ]
+        
+        # 定义LLM调用函数
+        async def call_llm(messages: List[Dict]) -> Dict:
+            """调用LLM API"""
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{DEEPSEEK_BASE_URL}/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": DEEPSEEK_MODEL,
+                        "messages": messages,
+                        "temperature": TEMPERATURE,
+                        "max_tokens": MAX_TOKENS,
+                        "stream": False
+                    }
+                ) as resp:
+                    if resp.status != 200:
+                        raise HTTPException(status_code=resp.status, detail="LLM API调用失败")
+                    
+                    data = await resp.json()
+                    return {
+                        'content': data['choices'][0]['message']['content'],
+                        'status': 'success'
+                    }
+        
+        # 处理工具调用循环
+        result = await tool_call_loop(messages, naga_agent.mcp, call_llm, is_streaming=False)
+        
+        # 提取最终响应
+        response_text = result['content']
         
         return ChatResponse(
             response=extract_message(response_text) if response_text else response_text,
@@ -159,22 +190,62 @@ async def chat_stream(request: ChatRequest):
     
     async def generate_response() -> AsyncGenerator[str, None]:
         try:
-            async for speaker, content in naga_agent.process(request.message):
-                if speaker == "娜迦":
-                    # 使用extract_message提取纯文本
-                    extracted_content = extract_message(str(content))
-                    # 使用Server-Sent Events格式
-                    yield f"data: {json.dumps({'content': extracted_content, 'speaker': speaker}, ensure_ascii=False)}\n\n"
-            yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
+            # 构建消息
+            messages = [
+                {"role": "user", "content": request.message}
+            ]
+            
+            # 定义LLM调用函数
+            async def call_llm(messages: List[Dict]) -> Dict:
+                """调用LLM API"""
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        f"{DEEPSEEK_BASE_URL}/v1/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                            "Content-Type": "application/json"
+                        },
+                        json={
+                            "model": DEEPSEEK_MODEL,
+                            "messages": messages,
+                            "temperature": TEMPERATURE,
+                            "max_tokens": MAX_TOKENS,
+                            "stream": False
+                        }
+                    ) as resp:
+                        if resp.status != 200:
+                            raise HTTPException(status_code=resp.status, detail="LLM API调用失败")
+                        
+                        data = await resp.json()
+                        return {
+                            'content': data['choices'][0]['message']['content'],
+                            'status': 'success'
+                        }
+            
+            # 处理工具调用循环
+            result = await tool_call_loop(messages, naga_agent.mcp, call_llm, is_streaming=True)
+            
+            # 流式输出最终结果
+            final_content = result['content']
+            for line in final_content.splitlines():
+                if line.strip():
+                    yield f"data: {line}\n\n"
+            
+            yield "data: [DONE]\n\n"
+            
         except Exception as e:
-            print(f"流式对话错误: {e}")
+            print(f"流式对话处理错误: {e}")
             traceback.print_exc()
-            yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
+            yield f"data: 错误: {str(e)}\n\n"
     
     return StreamingResponse(
         generate_response(),
         media_type="text/plain",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Content-Type": "text/event-stream"
+        }
     )
 
 @app.post("/mcp/handoff")
@@ -184,19 +255,21 @@ async def mcp_handoff(request: MCPRequest):
         raise HTTPException(status_code=503, detail="NagaAgent未初始化")
     
     try:
+        # 直接调用MCP handoff
         result = await naga_agent.mcp.handoff(
             service_name=request.service_name,
             task=request.task
         )
+        
         return {
+            "status": "success",
             "result": result,
-            "session_id": request.session_id,
-            "status": "success"
+            "session_id": request.session_id
         }
     except Exception as e:
-        print(f"MCP调用错误: {e}")
+        print(f"MCP handoff错误: {e}")
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"MCP调用失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"handoff失败: {str(e)}")
 
 @app.get("/mcp/services")
 async def get_mcp_services():
@@ -205,14 +278,16 @@ async def get_mcp_services():
         raise HTTPException(status_code=503, detail="NagaAgent未初始化")
     
     try:
-        services = naga_agent.mcp.get_available_services()
+        services = naga_agent.mcp.list_mcps()
         return {
+            "status": "success",
             "services": services,
-            "status": "success"
+            "count": len(services)
         }
     except Exception as e:
         print(f"获取MCP服务列表错误: {e}")
-        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"获取服务列表失败: {str(e)}")
 
 @app.post("/system/devmode")
 async def toggle_devmode():
@@ -220,32 +295,108 @@ async def toggle_devmode():
     if not naga_agent:
         raise HTTPException(status_code=503, detail="NagaAgent未初始化")
     
-    naga_agent.dev_mode = not naga_agent.dev_mode
-    return {
-        "dev_mode": naga_agent.dev_mode,
-        "message": f"开发者模式已{'开启' if naga_agent.dev_mode else '关闭'}",
-        "status": "success"
-    }
+    try:
+        naga_agent.dev_mode = not naga_agent.dev_mode
+        return {
+            "status": "success",
+            "dev_mode": naga_agent.dev_mode,
+            "message": f"开发者模式已{'启用' if naga_agent.dev_mode else '禁用'}"
+        }
+    except Exception as e:
+        print(f"切换开发者模式错误: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"切换开发者模式失败: {str(e)}")
 
 @app.get("/memory/stats")
 async def get_memory_stats():
-    """获取记忆系统统计信息"""
+    """获取记忆统计信息"""
     if not naga_agent:
         raise HTTPException(status_code=503, detail="NagaAgent未初始化")
     
     try:
-        stats = {
-            "total_memories": len(naga_agent.memory.memories) if hasattr(naga_agent, 'memory') else 0,
-            "dev_mode": naga_agent.dev_mode,
-            "message_count": len(naga_agent.messages)
-        }
+        # 这里可以添加记忆统计逻辑
         return {
-            "stats": stats,
-            "status": "success"
+            "status": "success",
+            "memory_manager_ready": naga_agent.memory is not None,
+            "message": "记忆管理器已就绪"
         }
     except Exception as e:
         print(f"获取记忆统计错误: {e}")
-        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"获取记忆统计失败: {str(e)}")
+
+# 工具调用循环相关函数
+
+def parse_tool_calls(content: str) -> list:
+    """解析TOOL_REQUEST格式的工具调用"""
+    tool_calls = []
+    tool_request_start = "<<<[TOOL_REQUEST]>>>"
+    tool_request_end = "<<<[END_TOOL_REQUEST]>>>"
+    start_index = 0
+    while True:
+        start_pos = content.find(tool_request_start, start_index)
+        if start_pos == -1:
+            break
+        end_pos = content.find(tool_request_end, start_pos)
+        if end_pos == -1:
+            start_index = start_pos + len(tool_request_start)
+            continue
+        tool_content = content[start_pos + len(tool_request_start):end_pos].strip()
+        tool_name = None
+        tool_args = {}
+        param_pattern = r'(\w+)\s*:\s*「始」([\s\S]*?)「末」'
+        for match in re.finditer(param_pattern, tool_content):
+            key = match.group(1)
+            value = match.group(2).strip()
+            if key == 'tool_name':
+                tool_name = value
+            else:
+                tool_args[key] = value
+        if tool_name:
+            tool_calls.append({'name': tool_name, 'args': tool_args})
+        start_index = end_pos + len(tool_request_end)
+    return tool_calls
+
+async def execute_tool_calls(tool_calls: list, mcp_manager) -> str:
+    """执行工具调用"""
+    results = []
+    for tool_call in tool_calls:
+        try:
+            result = await mcp_manager.handoff(
+                service_name=tool_call['name'],
+                task=tool_call['args']
+            )
+            results.append(f"来自工具 \"{tool_call['name']}\" 的结果:\n{result}")
+        except Exception as e:
+            error_result = f"执行工具 {tool_call['name']} 时发生错误：{str(e)}"
+            results.append(error_result)
+    return "\n\n---\n\n".join(results)
+
+async def tool_call_loop(messages: list, mcp_manager, llm_caller, is_streaming: bool = False) -> dict:
+    """工具调用循环主流程"""
+    recursion_depth = 0
+    max_recursion = int(os.getenv('MaxVCPLoopStream', '5')) if is_streaming else int(os.getenv('MaxVCPLoopNonStream', '5'))
+    current_messages = messages.copy()
+    current_ai_content = ''
+    while recursion_depth < max_recursion:
+        try:
+            llm_response = await llm_caller(current_messages)
+            current_ai_content = llm_response.get('content', '')
+            tool_calls = parse_tool_calls(current_ai_content)
+            if not tool_calls:
+                break
+            tool_results = await execute_tool_calls(tool_calls, mcp_manager)
+            current_messages.append({'role': 'assistant', 'content': current_ai_content})
+            current_messages.append({'role': 'user', 'content': tool_results})
+            recursion_depth += 1
+        except Exception as e:
+            print(f"工具调用循环错误: {e}")
+            break
+    return {
+        'content': current_ai_content,
+        'recursion_depth': recursion_depth,
+        'messages': current_messages
+    }
 
 if __name__ == "__main__":
     import argparse
