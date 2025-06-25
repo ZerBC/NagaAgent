@@ -14,6 +14,7 @@ from pathlib import Path
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcpserver.mcp_registry import MCP_REGISTRY, register_all_handoffs # MCP服务注册表和handoff批量注册
+from mcpserver.websocket_manager import get_websocket_manager # 导入WebSocket管理器
 
 from config import DEBUG, LOG_LEVEL
 
@@ -130,7 +131,17 @@ class MCPManager:
         self.handoff_filters = {} # 服务对应的handoff过滤器
         self.handoff_callbacks = {} # 服务对应的handoff回调
         self.logger = logging.getLogger("MCPManager")
+        self.websocket_manager = get_websocket_manager() # 获取WebSocket管理器
         sys.stderr.write("MCPManager初始化\n")
+        
+    async def initialize_websocket(self, host: str = '127.0.0.1', port: int = 8081):
+        """初始化WebSocket管理器"""
+        try:
+            self.websocket_manager.set_mcp_manager(self)
+            await self.websocket_manager.start_server(host, port)
+            sys.stderr.write(f"WebSocket管理器已启动: ws://{host}:{port}\n")
+        except Exception as e:
+            sys.stderr.write(f"WebSocket管理器启动失败: {e}\n")
         
     def register_handoff(
         self,
@@ -146,7 +157,6 @@ class MCPManager:
         if service_name in self.services:
             sys.stderr.write(f"服务{service_name}已注册，跳过重复注册\n")
             return
-        sys.stderr.write(f"注册服务: {service_name}, agent: {agent_name}\n")
         self.services[service_name] = {
             "tool_name": tool_name,
             "tool_description": tool_description,
@@ -175,6 +185,13 @@ class MCPManager:
     ) -> str:
         """执行handoff"""
         try:
+            # 通知handoff调用开始
+            await self.websocket_manager.notify_handoff_call(
+                service_name=service_name,
+                task=task,
+                status="started"
+            )
+            
             # 修复中文编码问题
             task_json = json.dumps(task, ensure_ascii=False)
             sys.stderr.write(f"执行handoff: service={service_name}, task={task_json}\n".encode('utf-8', errors='replace').decode('utf-8'))
@@ -219,6 +236,15 @@ class MCPManager:
             sys.stderr.write("开始执行代理handoff\n".encode('utf-8', errors='replace').decode('utf-8'))
             result = await agent.handle_handoff(task)
             sys.stderr.write(f"代理handoff执行结果: {result}\n".encode('utf-8', errors='replace').decode('utf-8'))
+            
+            # 通知handoff调用成功
+            await self.websocket_manager.notify_handoff_call(
+                service_name=service_name,
+                task=task,
+                status="success",
+                result=result
+            )
+            
             return result
             
         except Exception as e:
@@ -226,6 +252,15 @@ class MCPManager:
             sys.stderr.write(f"{error_msg}\n".encode('utf-8', errors='replace').decode('utf-8'))
             import traceback
             traceback.print_exc(file=sys.stderr)
+            
+            # 通知handoff调用失败
+            await self.websocket_manager.notify_handoff_call(
+                service_name=service_name,
+                task=task,
+                status="error",
+                error=error_msg
+            )
+            
             return json.dumps({
                 "status": "error",
                 "message": error_msg

@@ -43,6 +43,7 @@ class NagaConversation: # 对话主类
         self.async_client = AsyncOpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL.rstrip('/') + '/')
         self.memory = MemoryManager()  # 新增：初始化记忆管理器
         self.compat_mode = False  # 新增：兼容升级模式状态
+        
         global _MCP_HANDOFF_REGISTERED
         if not _MCP_HANDOFF_REGISTERED:
             try:
@@ -53,6 +54,14 @@ class NagaConversation: # 对话主类
             except Exception as e:
                 logger.error(f"注册Agent handoff处理器失败: {e}")
                 traceback.print_exc(file=sys.stderr)
+
+    async def _init_websocket(self):
+        """初始化WebSocket管理器"""
+        try:
+            await self.mcp.initialize_websocket(host='127.0.0.1', port=8081)
+            logger.info("WebSocket管理器初始化完成")
+        except Exception as e:
+            logger.error(f"WebSocket管理器初始化失败: {e}")
 
     def save_log(self, u, a):  # 保存对话日志
         if self.dev_mode:
@@ -153,7 +162,7 @@ class NagaConversation: # 对话主类
             start_index = end_pos + len(tool_request_end)
         return tool_calls
 
-    async def execute_tool_calls(self, tool_calls: list) -> str:
+    async def _execute_tool_calls(self, tool_calls: list) -> str:
         """执行工具调用"""
         results = []
         for tool_call in tool_calls:

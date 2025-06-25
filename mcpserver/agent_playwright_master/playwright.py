@@ -294,12 +294,12 @@ class LocalPlaywrightComputer(AsyncComputer):
             # 获取页面信息
             try:
                 title = await self.page.title()
-            except:
+            except Exception:
                 title = "无法获取标题"
             
             try:
                 content = await self.page.content()
-            except:
+            except Exception:
                 content = ""
             
             self.context.update(url=url, title=title, content=content)
@@ -507,7 +507,7 @@ def extract_url(text: str) -> str:
     if not text:
         return ""
     # 直接URL模式
-    url_pattern = r'https?://[^\s<>"\']+|www\.[^\s<>"\']+'
+    url_pattern = r'https?://[^\s<>"]+|www\.[^\s<>"]+'
     urls = re.findall(url_pattern, text)
     if urls:
         url = urls[0]

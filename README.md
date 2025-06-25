@@ -1,4 +1,4 @@
-# NagaAgent 3.0beta
+# NagaAgent 2.3
 
 > 智能对话助手，支持多MCP服务、流式语音交互、主题树检索、RESTful API接口、极致精简代码风格。
 

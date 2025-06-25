@@ -1,15 +1,21 @@
 import sys, os; sys.path.insert(0, os.path.abspath(os.path.dirname(__file__) + '/..'))
 import sys, datetime
-from PyQt5.QtWidgets import QApplication, QWidget, QTextEdit, QSizePolicy, QGraphicsBlurEffect, QHBoxLayout, QLabel, QVBoxLayout, QStackedLayout, QPushButton, QStackedWidget, QDesktopWidget
+from PyQt5.QtWidgets import QApplication, QWidget, QTextEdit, QSizePolicy, QGraphicsBlurEffect, QHBoxLayout, QLabel, QVBoxLayout, QStackedLayout, QPushButton, QStackedWidget, QDesktopWidget, QScrollArea, QSplitter, QGraphicsDropShadowEffect
 from PyQt5.QtCore import Qt, QRect, QThread, pyqtSignal, QParallelAnimationGroup, QPropertyAnimation, QEasingCurve, QTimer
-from PyQt5.QtGui import QColor, QPainter, QBrush, QFont, QPixmap
+from PyQt5.QtGui import QColor, QPainter, QBrush, QFont, QPixmap, QPalette, QPen
 from conversation_core import NagaConversation
 import os
 import config # 导入全局配置
 from ui.response_utils import extract_message  # 新增：引入消息提取工具
 from ui.progress_widget import EnhancedProgressWidget  # 导入进度组件
 from ui.enhanced_worker import StreamingWorker, BatchWorker  # 导入增强Worker
-BG_ALPHA=0.7 # 聊天背景透明度40%
+from ui.elegant_settings_widget import ElegantSettingsWidget
+import asyncio
+import json
+import websockets
+from PyQt5.QtCore import QObject, pyqtSignal as Signal
+BG_ALPHA=0.5 # 聊天背景透明度50%
+WINDOW_BG_ALPHA=110 # 主窗口背景透明度 (0-255，220约为86%不透明度)
 USER_NAME=os.getenv('COMPUTERNAME')or os.getenv('USERNAME')or'用户' # 自动识别电脑名
 MAC_BTN_SIZE=36 # mac圆按钮直径扩大1.5倍
 MAC_BTN_MARGIN=16 # 右侧边距
@@ -57,6 +63,245 @@ class TitleBar(QWidget):
         x=s.width()-MAC_BTN_MARGIN
         for i,btn in enumerate([s.btn_min,s.btn_close]):btn.move(x-MAC_BTN_SIZE*(2-i)-MAC_BTN_GAP*(1-i),36)
 
+class AnimatedSideWidget(QWidget):
+    """自定义侧栏Widget，支持动画发光效果"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.bg_alpha = int(BG_ALPHA * 255)
+        self.border_alpha = 50
+        self.glow_intensity = 0  # 发光强度 0-20
+        self.is_glowing = False
+        
+    def set_background_alpha(self, alpha):
+        """设置背景透明度"""
+        self.bg_alpha = alpha
+        self.update()
+        
+    def set_border_alpha(self, alpha):
+        """设置边框透明度"""
+        self.border_alpha = alpha
+        self.update()
+        
+    def set_glow_intensity(self, intensity):
+        """设置发光强度 0-20"""
+        self.glow_intensity = max(0, min(20, intensity))
+        self.update()
+        
+    def start_glow_animation(self):
+        """开始发光动画"""
+        self.is_glowing = True
+        self.update()
+        
+    def stop_glow_animation(self):
+        """停止发光动画"""
+        self.is_glowing = False
+        self.glow_intensity = 0
+        self.update()
+        
+    def paintEvent(self, event):
+        """自定义绘制方法"""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        
+        rect = self.rect()
+        
+        # 绘制发光效果（如果有）
+        if self.glow_intensity > 0:
+            glow_rect = rect.adjusted(-2, -2, 2, 2)
+            glow_color = QColor(100, 200, 255, self.glow_intensity)
+            painter.setPen(QPen(glow_color, 2))
+            painter.setBrush(QBrush(Qt.NoBrush))
+            painter.drawRoundedRect(glow_rect, 17, 17)
+        
+        # 绘制主要背景
+        bg_color = QColor(17, 17, 17, self.bg_alpha)
+        painter.setBrush(QBrush(bg_color))
+        
+        # 绘制边框
+        border_color = QColor(255, 255, 255, self.border_alpha)
+        painter.setPen(QPen(border_color, 1))
+        
+        # 绘制圆角矩形
+        painter.drawRoundedRect(rect, 15, 15)
+        
+        super().paintEvent(event)
+
+class AutoFitLabel(QLabel):
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self._img_path = os.path.join(os.path.dirname(__file__), 'standby.png')
+    def resizeEvent(self, event):
+        if os.path.exists(self._img_path):
+            q = QPixmap(self._img_path)
+            if not q.isNull():
+                self.setPixmap(q.scaled(self.width(), self.height(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
+        super().resizeEvent(event)
+
+class WebSocketClient(QObject):
+    """WebSocket客户端，用于接收MCP推送消息"""
+    
+    # 定义信号
+    message_received = Signal(str, str)  # 消息类型, 消息内容
+    connection_status = Signal(bool, str)  # 连接状态, 状态信息
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.websocket = None
+        self.connected = False
+        self.uri = "ws://127.0.0.1:8000/ws/mcplog"  # 使用API服务器的WebSocket端点
+        
+    async def connect(self):
+        """连接到WebSocket服务器"""
+        try:
+            self.websocket = await websockets.connect(self.uri)
+            self.connected = True
+            self.connection_status.emit(True, "WebSocket连接成功")
+            print("✅ WebSocket客户端已连接")
+            return True
+        except Exception as e:
+            self.connected = False
+            self.connection_status.emit(False, f"WebSocket连接失败: {e}")
+            print(f"❌ WebSocket连接失败: {e}")
+            return False
+    
+    async def disconnect(self):
+        """断开WebSocket连接"""
+        if self.websocket:
+            await self.websocket.close()
+            self.connected = False
+            self.connection_status.emit(False, "WebSocket连接已断开")
+            print("WebSocket连接已断开")
+    
+    async def listen_for_messages(self):
+        """监听WebSocket消息"""
+        if not self.websocket:
+            return
+            
+        try:
+            async for message in self.websocket:
+                try:
+                    data = json.loads(message)
+                    await self._process_message(data)
+                except json.JSONDecodeError:
+                    print(f"❌ 无法解析WebSocket消息: {message}")
+                except Exception as e:
+                    print(f"❌ 处理WebSocket消息时出错: {e}")
+        except websockets.exceptions.ConnectionClosed:
+            self.connected = False
+            self.connection_status.emit(False, "WebSocket连接已关闭")
+            print("❌ WebSocket连接已关闭")
+        except Exception as e:
+            self.connected = False
+            self.connection_status.emit(False, f"WebSocket监听错误: {e}")
+            print(f"❌ WebSocket监听错误: {e}")
+    
+    async def _process_message(self, data):
+        """处理接收到的消息"""
+        try:
+            msg_type = data.get('type', 'unknown')
+            
+            if msg_type == 'connection_ack':
+                # 连接确认消息
+                message = f"🔗 {data.get('message', '连接确认')}"
+                self.message_received.emit('connection', message)
+                
+            elif msg_type == 'handoff_call':
+                # Handoff调用消息
+                service_name = data.get('data', {}).get('service_name', '未知服务')
+                status = data.get('data', {}).get('status', 'unknown')
+                
+                if status == 'started':
+                    message = f"🚀 开始执行: {service_name}"
+                elif status == 'success':
+                    result = data.get('data', {}).get('result', '')
+                    message = f"✅ {service_name} 执行成功"
+                    if result:
+                        message += f"\n结果: {str(result)[:100]}..."
+                elif status == 'error':
+                    error = data.get('data', {}).get('error', '未知错误')
+                    message = f"❌ {service_name} 执行失败: {error}"
+                else:
+                    message = f"ℹ️ {service_name}: {status}"
+                    
+                self.message_received.emit('handoff', message)
+                
+            elif msg_type == 'tool_execution':
+                # 工具执行消息
+                service_name = data.get('data', {}).get('service_name', '未知服务')
+                tool_name = data.get('data', {}).get('tool_name', '未知工具')
+                status = data.get('data', {}).get('status', 'unknown')
+                
+                if status == 'started':
+                    message = f"🔧 工具调用: {service_name}.{tool_name}"
+                elif status == 'success':
+                    result = data.get('data', {}).get('result', '')
+                    message = f"✅ 工具 {service_name}.{tool_name} 执行成功"
+                    if result:
+                        message += f"\n结果: {str(result)[:100]}..."
+                elif status == 'error':
+                    error = data.get('data', {}).get('error', '未知错误')
+                    message = f"❌ 工具 {service_name}.{tool_name} 执行失败: {error}"
+                else:
+                    message = f"ℹ️ 工具 {service_name}.{tool_name}: {status}"
+                    
+                self.message_received.emit('tool', message)
+                
+            elif msg_type == 'mcp_event':
+                # MCP事件消息
+                event_type = data.get('data', {}).get('event_type', '未知事件')
+                event_data = data.get('data', {}).get('data', {})
+                message = f"📡 MCP事件: {event_type}"
+                if event_data:
+                    message += f"\n数据: {str(event_data)[:100]}..."
+                self.message_received.emit('mcp_event', message)
+                
+            else:
+                # 其他类型的消息
+                message = f"📨 收到消息: {json.dumps(data, ensure_ascii=False, indent=2)}"
+                self.message_received.emit('other', message)
+                
+        except Exception as e:
+            print(f"❌ 处理消息时出错: {e}")
+            self.message_received.emit('error', f"消息处理错误: {e}")
+
+class WebSocketThread(QThread):
+    """WebSocket客户端线程"""
+    
+    message_received = Signal(str, str)  # 消息类型, 消息内容
+    connection_status = Signal(bool, str)  # 连接状态, 状态信息
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.client = WebSocketClient()
+        self.client.message_received.connect(self.message_received.emit)
+        self.client.connection_status.connect(self.connection_status.emit)
+        self.running = False
+        
+    def run(self):
+        """线程运行方法"""
+        self.running = True
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            # 连接WebSocket
+            if loop.run_until_complete(self.client.connect()):
+                # 开始监听消息
+                loop.run_until_complete(self.client.listen_for_messages())
+        except Exception as e:
+            print(f"❌ WebSocket线程错误: {e}")
+        finally:
+            loop.run_until_complete(self.client.disconnect())
+            loop.close()
+            self.running = False
+    
+    def stop(self):
+        """停止线程"""
+        self.running = False
+        if self.client.websocket:
+            asyncio.create_task(self.client.disconnect())
+
 class ChatWindow(QWidget):
     def __init__(s):
         super().__init__()
@@ -80,18 +325,43 @@ class ChatWindow(QWidget):
         
         # 添加窗口背景和拖动支持
         s._offset = None
-        s.setStyleSheet("""
-            ChatWindow {
-                background: rgba(25, 25, 25, 220);
+        s.setStyleSheet(f"""
+            ChatWindow {{
+                background: rgba(25, 25, 25, {WINDOW_BG_ALPHA});
                 border-radius: 20px;
                 border: 1px solid rgba(255, 255, 255, 30);
+            }}
+        """)
+        
+        # 初始化WebSocket客户端
+        s.websocket_thread = WebSocketThread(s)
+        s.websocket_thread.message_received.connect(s.on_websocket_message)
+        s.websocket_thread.connection_status.connect(s.on_websocket_status)
+        
+        fontfam,fontbig,fontsize='Lucida Console',16,16
+        
+        # 创建主分割器，替换原来的HBoxLayout
+        s.main_splitter = QSplitter(Qt.Horizontal, s)
+        s.main_splitter.setStyleSheet("""
+            QSplitter {
+                background: transparent;
+            }
+            QSplitter::handle {
+                background: rgba(255, 255, 255, 30);
+                width: 2px;
+                border-radius: 1px;
+            }
+            QSplitter::handle:hover {
+                background: rgba(255, 255, 255, 60);
+                width: 3px;
             }
         """)
         
-        fontfam,fontbig,fontsize='Lucida Console',16,16
-        main=QHBoxLayout(s);main.setContentsMargins(10,110,10,10);main.setSpacing(0)
-        chat_area=QWidget(s)
+        # 聊天区域容器
+        chat_area=QWidget()
+        chat_area.setMinimumWidth(400)  # 设置最小宽度
         vlay=QVBoxLayout(chat_area);vlay.setContentsMargins(0,0,0,0);vlay.setSpacing(10)
+        
         # 用QStackedWidget管理聊天区和设置页
         s.chat_stack = QStackedWidget(chat_area)
         s.chat_stack.setStyleSheet("""
@@ -142,36 +412,23 @@ class ChatWindow(QWidget):
         s.input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
         hlay.addWidget(s.input)
         vlay.addWidget(s.input_wrap,0)
-        main.addWidget(chat_area,2)
-        gap=QWidget(s);gap.setFixedWidth(20);gap.setStyleSheet("background:transparent;")
-        main.addWidget(gap)
-        # 侧栏
-        s.side=QWidget(s);
-        s.side.setStyleSheet(f"""
-            QWidget {{
-                background: rgba(17,17,17,{int(BG_ALPHA*255)});
-                border-radius: 15px;
-                border: 1px solid rgba(255, 255, 255, 50);
-            }}
-        """)
-        s.side.setMinimumWidth(400);s.side.setMaximumWidth(400) # 固定400像素
         
-        # 优化侧栏的悬停效果，增加点击提示
+        # 将聊天区域添加到分割器
+        s.main_splitter.addWidget(chat_area)
+        
+        # 侧栏（图片显示区域）- 使用自定义动画Widget
+        s.side = AnimatedSideWidget()
+        s.side.setMinimumWidth(300)  # 设置最小宽度
+        s.side.setMaximumWidth(800)  # 设置最大宽度
+        
+        # 优化侧栏的悬停效果，使用QPainter绘制
         def setup_side_hover_effects():
-            original_enter = lambda e: s.side.setStyleSheet(f"""
-                QWidget {{
-                    background: rgba(17,17,17,{int(BG_ALPHA*0.5*255)});
-                    border-radius: 15px;
-                    border: 1px solid rgba(255, 255, 255, 80);
-                }}
-            """)
-            original_leave = lambda e: s.side.setStyleSheet(f"""
-                QWidget {{
-                    background: rgba(17,17,17,{int(BG_ALPHA*255)});
-                    border-radius: 15px;
-                    border: 1px solid rgba(255, 255, 255, 50);
-                }}
-            """)
+            def original_enter(e):
+                s.side.set_background_alpha(int(BG_ALPHA * 0.5 * 255))
+                s.side.set_border_alpha(80)
+            def original_leave(e):
+                s.side.set_background_alpha(int(BG_ALPHA * 255))
+                s.side.set_border_alpha(50)
             return original_enter, original_leave
         
         s.side_hover_enter, s.side_hover_leave = setup_side_hover_effects()
@@ -203,14 +460,26 @@ class ChatWindow(QWidget):
         nick.setAlignment(Qt.AlignHCenter|Qt.AlignTop)
         nick.setAttribute(Qt.WA_TransparentForMouseEvents)
         stack.addWidget(nick)
-        main.addWidget(s.side,1)
+        
+        # 将侧栏添加到分割器
+        s.main_splitter.addWidget(s.side)
+        
+        # 设置分割器的初始比例
+        s.main_splitter.setSizes([window_width * 2 // 3, window_width // 3])  # 2:1的比例
+        
+        # 创建包含分割器的主布局
+        main=QVBoxLayout(s)
+        main.setContentsMargins(10,110,10,10)
+        main.addWidget(s.main_splitter)
+        
         s.nick=nick
         s.naga=NagaConversation()
         s.worker=None
         s.full_img=0 # 立绘展开标志
         s.streaming_mode = True  # 默认启用流式模式
         s.current_response = ""  # 当前响应缓冲
-        s._animating = False  # 动画标志位，动画期间为True
+        s.animating = False  # 动画标志位，动画期间为True
+        s._img_inited = False  # 标志变量，图片自适应只在初始化时触发一次
         
         # 连接进度组件信号
         s.progress_widget.cancel_requested.connect(s.cancel_current_task)
@@ -221,22 +490,65 @@ class ChatWindow(QWidget):
         s.titlebar = TitleBar('NAGA AGENT', s)
         s.titlebar.setGeometry(0,0,s.width(),100)
         s.side.mousePressEvent=s.toggle_full_img # 侧栏点击切换聊天/设置
+        s.resizeEvent(None)  # 强制自适应一次，修复图片初始尺寸
 
     def create_settings_page(s):
-        from ui.settings_api_config import ApiConfigWidget  # 延迟导入避免循环依赖
         page = QWidget()
         page.setObjectName("SettingsPage")
         page.setStyleSheet("""
             #SettingsPage {
                 background: transparent;
                 border-radius: 24px;
-                padding: 24px;
+                padding: 12px;
             }
         """)
         layout = QVBoxLayout(page)
-        # 嵌入API配置界面
-        api_widget = ApiConfigWidget(page)
-        layout.addWidget(api_widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        # 创建滚动区域
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setStyleSheet("""
+            QScrollArea {
+                background: transparent;
+                border: none;
+            }
+            QScrollArea > QWidget > QWidget {
+                background: transparent;
+            }
+            QScrollBar:vertical {
+                background: rgba(255, 255, 255, 20);
+                width: 6px;
+                border-radius: 3px;
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(255, 255, 255, 60);
+                border-radius: 3px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: rgba(255, 255, 255, 80);
+            }
+        """)
+        scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # 滚动内容
+        scroll_content = QWidget()
+        scroll_content.setStyleSheet("background: transparent;")
+        scroll_content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setContentsMargins(12, 12, 12, 12)
+        scroll_layout.setSpacing(20)
+        # 只保留系统设置界面
+        s.settings_widget = ElegantSettingsWidget(scroll_content)
+        s.settings_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        s.settings_widget.settings_changed.connect(s.on_settings_changed)
+        scroll_layout.addWidget(s.settings_widget, 1)
+        scroll_layout.addStretch()
+        scroll_area.setWidget(scroll_content)
+        layout.addWidget(scroll_area, 1)
         return page
 
     def resizeEvent(s, e):
@@ -256,7 +568,7 @@ class ChatWindow(QWidget):
         h = int(doc.size().height())+10
         s.input.setFixedHeight(min(max(48, h), 120))
         s.input_wrap.setFixedHeight(s.input.height())
-        s.resizeEvent(None)
+        
     def eventFilter(s, obj, event):
         if obj is s.input and event.type()==6:
             if event.key()==Qt.Key_Return and not (event.modifiers()&Qt.ShiftModifier):
@@ -264,7 +576,9 @@ class ChatWindow(QWidget):
         return False
     def add_user_message(s, name, content):
         # 先把\n转成\n，再把\n转成<br>，适配所有换行
-        content_html = str(content).replace('\\n', '\n').replace('\n', '<br>')
+        from ui.response_utils import extract_message
+        msg = extract_message(content)
+        content_html = str(msg).replace('\\n', '\n').replace('\n', '<br>')
         s.text.append(f"<span style='color:#fff;font-size:12pt;font-family:Lucida Console;'>{name}</span>")
         s.text.append(f"<span style='color:#fff;font-size:16pt;font-family:Lucida Console;'>{content_html}</span>")
     def on_send(s):
@@ -327,7 +641,7 @@ class ChatWindow(QWidget):
     def finalize_streaming_response(s):
         """完成流式响应"""
         if s.current_response:
-            # 对累积的完整响应进行消息提取
+            # 对累积的完整响应进行消息提取（多步自动\n分隔）
             from ui.response_utils import extract_message
             final_message = extract_message(s.current_response)
             s.add_user_message("娜迦", final_message)
@@ -338,9 +652,10 @@ class ChatWindow(QWidget):
         # 检查是否是取消操作的响应
         if response == "操作已取消":
             return  # 不显示，因为已经在cancel_current_task中显示了
-        
         if not s.current_response:  # 如果流式没有收到数据，使用最终结果
-            s.add_user_message("娜迦", response)
+            from ui.response_utils import extract_message
+            final_message = extract_message(response)
+            s.add_user_message("娜迦", final_message)
         s.progress_widget.stop_loading()
     
     def on_batch_response_finished(s, response):
@@ -348,8 +663,9 @@ class ChatWindow(QWidget):
         # 检查是否是取消操作的响应
         if response == "操作已取消":
             return  # 不显示，因为已经在cancel_current_task中显示了
-            
-        s.add_user_message("娜迦", response)
+        from ui.response_utils import extract_message
+        final_message = extract_message(response)
+        s.add_user_message("娜迦", final_message)
         s.progress_widget.stop_loading()
     
     def handle_error(s, error_msg):
@@ -511,10 +827,160 @@ class ChatWindow(QWidget):
         painter = QPainter(s)
         painter.setRenderHint(QPainter.Antialiasing)
         
-        # 绘制主窗口背景
-        painter.setBrush(QBrush(QColor(25, 25, 25, 220)))
+        # 绘制主窗口背景 - 使用可调节的透明度
+        painter.setBrush(QBrush(QColor(25, 25, 25, WINDOW_BG_ALPHA)))
         painter.setPen(QColor(255, 255, 255, 30))
         painter.drawRoundedRect(s.rect(), 20, 20)
+
+    def on_settings_changed(s, setting_key, value):
+        """处理设置变化"""
+        print(f"设置变化: {setting_key} = {value}")
+        
+        # 这里可以实时应用某些设置变化
+        if setting_key == "STREAM_MODE":
+            s.streaming_mode = value
+            s.add_user_message("系统", f"● 流式模式已{'启用' if value else '禁用'}")
+        elif setting_key == "BG_ALPHA":
+            # 实时更新背景透明度
+            global BG_ALPHA
+            BG_ALPHA = value / 100.0
+            # 这里可以添加实时更新UI的代码
+        elif setting_key == "VOICE_ENABLED":
+            s.add_user_message("系统", f"● 语音功能已{'启用' if value else '禁用'}")
+        elif setting_key == "DEBUG":
+            s.add_user_message("系统", f"● 调试模式已{'启用' if value else '禁用'}")
+        
+        # 发送设置变化信号给其他组件
+        # 这里可以根据需要添加更多处理逻辑
+
+    def set_window_background_alpha(s, alpha):
+        """设置整个窗口的背景透明度
+        Args:
+            alpha: 透明度值，可以是:
+                   - 0-255的整数 (PyQt原生格式)
+                   - 0.0-1.0的浮点数 (百分比格式)
+        """
+        global WINDOW_BG_ALPHA
+        
+        # 处理不同格式的输入
+        if isinstance(alpha, float) and 0.0 <= alpha <= 1.0:
+            # 浮点数格式：0.0-1.0 转换为 0-255
+            WINDOW_BG_ALPHA = int(alpha * 255)
+        elif isinstance(alpha, int) and 0 <= alpha <= 255:
+            # 整数格式：0-255
+            WINDOW_BG_ALPHA = alpha
+        else:
+            print(f"警告：无效的透明度值 {alpha}，应为0-255的整数或0.0-1.0的浮点数")
+            return
+        
+        # 更新CSS样式表
+        s.setStyleSheet(f"""
+            ChatWindow {{
+                background: rgba(25, 25, 25, {WINDOW_BG_ALPHA});
+                border-radius: 20px;
+                border: 1px solid rgba(255, 255, 255, 30);
+            }}
+        """)
+    
+        # 触发重绘
+        s.update()
+        
+        print(f"✅ 窗口背景透明度已设置为: {WINDOW_BG_ALPHA}/255 ({WINDOW_BG_ALPHA/255*100:.1f}%不透明度)")
+
+    def showEvent(s, event):
+        """窗口显示事件"""
+        super().showEvent(event)
+        
+        # 启动WebSocket客户端
+        if not s.websocket_thread.isRunning():
+            s.websocket_thread.start()
+            print("🚀 WebSocket客户端线程已启动")
+        
+        # 其他初始化代码...
+        s.setFocus()
+        s.input.setFocus()
+        if not getattr(s, '_img_inited', False):
+            if hasattr(s, 'img'):
+                s.img.resize(s.img.parent().width(), s.img.parent().height())
+                p = os.path.join(os.path.dirname(__file__), 'standby.png')
+                q = QPixmap(p)
+                if os.path.exists(p) and not q.isNull():
+                    s.img.setPixmap(q.scaled(s.img.width(), s.img.height(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
+            s._img_inited = True
+
+    def on_websocket_message(s, msg_type, message):
+        """处理WebSocket消息"""
+        try:
+            # 根据消息类型设置不同的样式
+            if msg_type == 'connection':
+                # 连接状态消息 - 使用蓝色
+                formatted_message = f'<div style="color: #4FC3F7; font-style: italic; margin: 5px 0;">{message}</div>'
+            elif msg_type == 'handoff':
+                # Handoff消息 - 使用橙色
+                formatted_message = f'<div style="color: #FF9800; font-weight: bold; margin: 5px 0;">{message}</div>'
+            elif msg_type == 'tool':
+                # 工具执行消息 - 使用绿色
+                formatted_message = f'<div style="color: #4CAF50; font-weight: bold; margin: 5px 0;">{message}</div>'
+            elif msg_type == 'mcp_event':
+                # MCP事件消息 - 使用紫色
+                formatted_message = f'<div style="color: #9C27B0; font-weight: bold; margin: 5px 0;">{message}</div>'
+            elif msg_type == 'error':
+                # 错误消息 - 使用红色
+                formatted_message = f'<div style="color: #F44336; font-weight: bold; margin: 5px 0;">{message}</div>'
+            else:
+                # 其他消息 - 使用灰色
+                formatted_message = f'<div style="color: #9E9E9E; font-style: italic; margin: 5px 0;">{message}</div>'
+            
+            # 添加时间戳
+            timestamp = datetime.datetime.now().strftime('%H:%M:%S')
+            timestamp_html = f'<span style="color: #666; font-size: 12px;">[{timestamp}]</span> '
+            
+            # 将消息添加到聊天历史
+            s.text.append(timestamp_html + formatted_message)
+            
+            # 滚动到底部
+            s.text.verticalScrollBar().setValue(s.text.verticalScrollBar().maximum())
+            
+            print(f"📨 WebSocket消息已显示: {msg_type} - {message}")
+            
+        except Exception as e:
+            print(f"❌ 处理WebSocket消息时出错: {e}")
+    
+    def on_websocket_status(s, connected, status):
+        """处理WebSocket连接状态"""
+        try:
+            if connected:
+                # 连接成功 - 显示绿色状态
+                status_message = f'<div style="color: #4CAF50; font-weight: bold; margin: 5px 0;">🔗 {status}</div>'
+            else:
+                # 连接失败或断开 - 显示红色状态
+                status_message = f'<div style="color: #F44336; font-weight: bold; margin: 5px 0;">❌ {status}</div>'
+            
+            # 添加时间戳
+            timestamp = datetime.datetime.now().strftime('%H:%M:%S')
+            timestamp_html = f'<span style="color: #666; font-size: 12px;">[{timestamp}]</span> '
+            
+            # 将状态消息添加到聊天历史
+            s.text.append(timestamp_html + status_message)
+            
+            # 滚动到底部
+            s.text.verticalScrollBar().setValue(s.text.verticalScrollBar().maximum())
+            
+            print(f"🔗 WebSocket状态: {connected} - {status}")
+            
+        except Exception as e:
+            print(f"❌ 处理WebSocket状态时出错: {e}")
+    
+    def closeEvent(s, event):
+        """窗口关闭事件"""
+        # 停止WebSocket线程
+        if s.websocket_thread.isRunning():
+            s.websocket_thread.stop()
+            s.websocket_thread.wait(3000)  # 等待最多3秒
+            print("🛑 WebSocket客户端线程已停止")
+        
+        # 调用父类的closeEvent
+        super().closeEvent(event)
 
 if __name__=="__main__":
     app = QApplication(sys.argv)

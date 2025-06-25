@@ -17,6 +17,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 import aiohttp
 
@@ -27,6 +28,31 @@ from ui.response_utils import extract_message  # 导入消息提取工具
 
 # 全局NagaAgent实例
 naga_agent: Optional[NagaConversation] = None
+
+# WebSocket连接管理
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def send_personal_message(self, message: str, websocket: WebSocket):
+        await websocket.send_text(message)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except:
+                # 移除断开的连接
+                self.active_connections.remove(connection)
+
+manager = ConnectionManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -88,6 +114,41 @@ class SystemInfoResponse(BaseModel):
     available_services: List[str]
     api_key_configured: bool
 
+# WebSocket路由
+@app.websocket("/ws/mcplog")
+async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket端点 - 提供MCP实时通知"""
+    await manager.connect(websocket)
+    try:
+        # 发送连接确认
+        await manager.send_personal_message(
+            json.dumps({
+                "type": "connection_ack",
+                "message": "WebSocket连接成功"
+            }, ensure_ascii=False),
+            websocket
+        )
+        
+        # 保持连接
+        while True:
+            try:
+                # 等待客户端消息（心跳检测）
+                data = await websocket.receive_text()
+                # 可以处理客户端发送的消息
+                await manager.send_personal_message(
+                    json.dumps({
+                        "type": "pong",
+                        "message": "收到心跳"
+                    }, ensure_ascii=False),
+                    websocket
+                )
+            except WebSocketDisconnect:
+                manager.disconnect(websocket)
+                break
+    except Exception as e:
+        print(f"WebSocket错误: {e}")
+        manager.disconnect(websocket)
+
 # API路由
 @app.get("/", response_model=Dict[str, str])
 async def root():
@@ -96,7 +157,8 @@ async def root():
         "name": "NagaAgent API",
         "version": "2.3",
         "status": "running",
-        "docs": "/docs"
+        "docs": "/docs",
+        "websocket": "/ws/mcplog"
     }
 
 @app.get("/health")
@@ -294,7 +356,6 @@ async def toggle_devmode():
     """切换开发者模式"""
     if not naga_agent:
         raise HTTPException(status_code=503, detail="NagaAgent未初始化")
-    
     try:
         naga_agent.dev_mode = not naga_agent.dev_mode
         return {

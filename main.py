@@ -127,6 +127,9 @@ show_help()
 loop=asyncio.new_event_loop()
 threading.Thread(target=loop.run_forever,daemon=True).start()
 
+# 推迟WebSocket初始化到事件循环环境下
+asyncio.run_coroutine_threadsafe(n._init_websocket(), loop)
+
 class NagaAgentAdapter:
  def __init__(s):s.naga=NagaConversation()
  async def respond_stream(s,txt):
