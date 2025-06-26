@@ -101,6 +101,16 @@ TEMPERATURE = 0.7 # 温度参数
 MAX_TOKENS = 2000 # 最大token数
 STREAM_MODE = True # 是否流式响应
 
+# GRAG知识图谱记忆系统配置
+GRAG_ENABLED = True # 是否启用GRAG记忆系统
+GRAG_AUTO_EXTRACT = True # 是否自动提取对话中的三元组
+GRAG_CONTEXT_LENGTH = 5 # 记忆上下文长度
+GRAG_SIMILARITY_THRESHOLD = 0.6 # 记忆检索相似度阈值
+GRAG_NEO4J_URI = "bolt://localhost:7687" # Neo4j连接URI
+GRAG_NEO4J_USER = "neo4j" # Neo4j用户名
+GRAG_NEO4J_PASSWORD = "hkm27iar" # Neo4j密码
+GRAG_NEO4J_DATABASE = "testnaga" # Neo4j数据库名
+
 # 工具调用循环配置
 MAX_VCP_LOOP_STREAM = int(os.getenv("MaxVCPLoopStream", "5"))  # 流式模式最大工具调用循环次数
 MAX_VCP_LOOP_NON_STREAM = int(os.getenv("MaxVCPLoopNonStream", "5"))  # 非流式模式最大工具调用循环次数
