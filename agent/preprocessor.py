@@ -38,7 +38,7 @@ class AgentPreprocessor:
             'env_vars': self._process_env_variables,
             'time_date': self._process_time_date,
             'static_plugins': self._process_static_plugins,
-            'vcp_tools': self._process_vcp_tools,
+            'handoff_tools': self._process_handoff_tools,
             'emoji': self._process_emoji_placeholders,
             'diary': self._process_diary_placeholders,
             'system_prompts': self._process_system_prompts,
@@ -204,20 +204,20 @@ class AgentPreprocessor:
         
         return text
     
-    async def _process_vcp_tools(self, text: str, model: str = None) -> str:
-        """处理VCP工具占位符"""
-        # 处理{{VCPAllTools}}占位符
-        if "{{VCPAllTools}}" in text:
-            vcp_descriptions = []
+    async def _process_handoff_tools(self, text: str, model: str = None) -> str:
+        """处理handoff工具占位符"""
+        # 处理{{handoffAllTools}}占位符
+        if "{{handoffAllTools}}" in text:
+            handoff_descriptions = []
             # 这里可以从插件管理器获取工具描述
-            vcp_descriptions.append("示例工具1: 这是一个示例工具的描述")
-            vcp_descriptions.append("示例工具2: 这是另一个示例工具的描述")
+            handoff_descriptions.append("示例工具1: 这是一个示例工具的描述")
+            handoff_descriptions.append("示例工具2: 这是另一个示例工具的描述")
             
-            all_tools_string = "\n\n---\n\n".join(vcp_descriptions) if vcp_descriptions else "没有可用的VCP工具描述信息"
-            text = text.replace("{{VCPAllTools}}", all_tools_string)
+            all_tools_string = "\n\n---\n\n".join(handoff_descriptions) if handoff_descriptions else "没有可用的handoff工具描述信息"
+            text = text.replace("{{handoffAllTools}}", all_tools_string)
         
-        # 处理{{VCPWeatherInfo}}占位符
-        text = text.replace("{{VCPWeatherInfo}}", "天气信息不可用")
+        # 处理{{handoffWeatherInfo}}占位符
+        text = text.replace("{{handoffWeatherInfo}}", "天气信息不可用")
         
         return text
     
@@ -258,7 +258,7 @@ class AgentPreprocessor:
     
     async def _process_async_results(self, text: str, model: str = None) -> str:
         """处理异步结果占位符"""
-        async_result_pattern = r'\{\{VCP_ASYNC_RESULT::([a-zA-Z0-9_.-]+)::([a-zA-Z0-9_-]+)\}\}'
+        async_result_pattern = r'\{\{handoff_ASYNC_RESULT::([a-zA-Z0-9_.-]+)::([a-zA-Z0-9_-]+)\}\}'
         
         def replace_async_result(match):
             plugin_name = match.group(1)

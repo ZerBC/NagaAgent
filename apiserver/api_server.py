@@ -79,7 +79,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="NagaAgent API",
     description="智能对话助手API服务",
-    version="2.3",
+    version="3.0",
     lifespan=lifespan
 )
 
@@ -155,7 +155,7 @@ async def root():
     """API根路径"""
     return {
         "name": "NagaAgent API",
-        "version": "2.3",
+        "version": "3.0",
         "status": "running",
         "docs": "/docs",
         "websocket": "/ws/mcplog"
@@ -177,7 +177,7 @@ async def get_system_info():
         raise HTTPException(status_code=503, detail="NagaAgent未初始化")
     
     return SystemInfoResponse(
-        version="2.3",
+        version="3.0",
         status="running",
         available_services=naga_agent.mcp.list_mcps(),
         api_key_configured=bool(DEEPSEEK_API_KEY and DEEPSEEK_API_KEY != "sk-placeholder-key-not-set")
@@ -436,7 +436,7 @@ async def execute_tool_calls(tool_calls: list, mcp_manager) -> str:
 async def tool_call_loop(messages: list, mcp_manager, llm_caller, is_streaming: bool = False) -> dict:
     """工具调用循环主流程"""
     recursion_depth = 0
-    max_recursion = int(os.getenv('MaxVCPLoopStream', '5')) if is_streaming else int(os.getenv('MaxVCPLoopNonStream', '5'))
+    max_recursion = int(os.getenv('MaxhandoffLoopStream', '5')) if is_streaming else int(os.getenv('MaxhandoffLoopNonStream', '5'))
     current_messages = messages.copy()
     current_ai_content = ''
     while recursion_depth < max_recursion:

@@ -95,9 +95,9 @@ NagaAgent的RESTful API服务器，提供智能对话、MCP服务调用等功能
 | `API_SERVER_HOST` | `127.0.0.1` | API服务器主机地址 |
 | `API_SERVER_PORT` | `8000` | API服务器端口 |
 | `API_SERVER_RELOAD` | `False` | 是否开启自动重载 |
-| `MaxVCPLoopStream` | `5` | 流式模式最大工具调用循环次数 |
-| `MaxVCPLoopNonStream` | `5` | 非流式模式最大工具调用循环次数 |
-| `ShowVCP` | `False` | 是否显示工具调用输出 |
+| `MaxhandoffLoopStream` | `5` | 流式模式最大工具调用循环次数 |
+| `MaxhandoffLoopNonStream` | `5` | 非流式模式最大工具调用循环次数 |
+| `Showhandoff` | `False` | 是否显示工具调用输出 |
 
 ### 工具调用格式
 

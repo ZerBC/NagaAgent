@@ -4,10 +4,8 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))  # 加入项目根�
 from flask import request, jsonify
 from functools import wraps
 import os
-from dotenv import load_dotenv
-import config # 顶部引入
-
-load_dotenv()
+# from dotenv import load_dotenv  # 移除，使用主系统配置
+import config  # 使用主系统配置
 
 def getenv_bool(name: str, default: bool = False) -> bool:
     return os.getenv(name, str(default)).lower() in ("yes", "y", "true", "1", "t")

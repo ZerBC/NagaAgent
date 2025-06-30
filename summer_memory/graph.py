@@ -8,7 +8,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 try:
-    from config import GRAG_NEO4J_URI, GRAG_NEO4J_USER, GRAG_NEO4J_PASSWORD, GRAG_NEO4J_DATABASE
+    from config import GRAG_NEO4J_URI, GRAG_NEO4J_USER, GRAG_NEO4J_PASSWORD, GRAG_NEO4J_DATABASE, GRAG_ENABLED
     NEO4J_URI = GRAG_NEO4J_URI
     NEO4J_USER = GRAG_NEO4J_USER
     NEO4J_PASSWORD = GRAG_NEO4J_PASSWORD
@@ -21,7 +21,7 @@ except ImportError:
     NEO4J_DATABASE = os.getenv("GRAG_NEO4J_DATABASE", "testnaga")
 
 logger = logging.getLogger(__name__)
-graph = Graph(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD), name=NEO4J_DATABASE)
+graph = Graph(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD), name=NEO4J_DATABASE) if GRAG_ENABLED else None
 TRIPLES_FILE = "triples.json"
 
 
@@ -45,18 +45,18 @@ def store_triples(new_triples):
     # 持久化到文件
     save_triples(all_triples)
 
-    # 同步更新Neo4j图谱数据库
-    for head, rel, tail in new_triples:
-        if not head or not tail:
-            logger.warning(f"跳过无效三元组，head或tail为空: {(head, rel, tail)}")
-            continue
-        h_node = Node("Entity", name=head)
-        t_node = Node("Entity", name=tail)
-        r = Relationship(h_node, rel, t_node)
-        graph.merge(h_node, "Entity", "name")
-        graph.merge(t_node, "Entity", "name")
-        graph.merge(r)
-
+    # 同步更新Neo4j图谱数据库（仅在GRAG_ENABLED时）
+    if graph is not None:
+        for head, rel, tail in new_triples:
+            if not head or not tail:
+                logger.warning(f"跳过无效三元组，head或tail为空: {(head, rel, tail)}")
+                continue
+            h_node = Node("Entity", name=head)
+            t_node = Node("Entity", name=tail)
+            r = Relationship(h_node, rel, t_node)
+            graph.merge(h_node, "Entity", "name")
+            graph.merge(t_node, "Entity", "name")
+            graph.merge(r)
 
 
 def get_all_triples():
@@ -65,14 +65,15 @@ def get_all_triples():
 
 def query_graph_by_keywords(keywords):
     results = []
-    for kw in keywords:
-        query = f"""
-        MATCH (e1:Entity)-[r]->(e2:Entity)
-        WHERE e1.name CONTAINS '{kw}' OR e2.name CONTAINS '{kw}' OR type(r) CONTAINS '{kw}'
-        RETURN e1.name, type(r), e2.name
-        LIMIT 5
-        """
-        res = graph.run(query).data()
-        for record in res:
-            results.append((record['e1.name'], record['type(r)'], record['e2.name']))
+    if graph is not None:
+        for kw in keywords:
+            query = f"""
+            MATCH (e1:Entity)-[r]->(e2:Entity)
+            WHERE e1.name CONTAINS '{kw}' OR e2.name CONTAINS '{kw}' OR type(r) CONTAINS '{kw}'
+            RETURN e1.name, type(r), e2.name
+            LIMIT 5
+            """
+            res = graph.run(query).data()
+            for record in res:
+                results.append((record['e1.name'], record['type(r)'], record['e2.name']))
     return results

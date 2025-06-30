@@ -80,7 +80,7 @@ def query_knowledge(user_question):
             return "未找到相关关键词，请提供更具体的问题。"
 
         logger.info(f"提取关键词: {keywords}")
-        from graph import query_graph_by_keywords
+        from .graph import query_graph_by_keywords
         triples = query_graph_by_keywords(keywords)
         if not triples:
             logger.info(f"未找到相关三元组: {keywords}")

@@ -5,7 +5,7 @@ import base64
 import librosa
 from flask import Flask, request, send_file, jsonify
 from gevent.pywsgi import WSGIServer
-from dotenv import load_dotenv
+# from dotenv import load_dotenv  # 移除，使用主系统配置
 import os
 from flask_cors import CORS
 
@@ -16,7 +16,7 @@ import config # 顶部引入
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
-load_dotenv()
+# load_dotenv()  # 移除，使用主系统配置
 
 API_KEY = config.TTS_API_KEY # 统一配置
 PORT = config.TTS_PORT

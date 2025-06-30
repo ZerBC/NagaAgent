@@ -1,10 +1,13 @@
 import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))  # 加入项目根目录到模块查找路径
+import asyncio
+import json
+import re
+# from dotenv import load_dotenv  # 移除，使用主系统配置
 import base64
+import tempfile
 import librosa
 import soundfile as sf
-from dotenv import load_dotenv
-import os
 from handle_text import prepare_tts_input_with_context
 from tts_handler import generate_speech, get_models, get_voices
 from utils import getenv_bool, require_api_key, AUDIO_FORMAT_MIME_TYPES
@@ -12,10 +15,8 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 import threading
 import logging
-import re
-import asyncio
 import uvicorn
-import config # 顶部引入
+import config  # 使用主系统配置
 
 
 # 配置日志
@@ -42,7 +43,7 @@ REQUEST_TIMEOUT = 60  # 请求处理超时（秒）
 # 断句正则表达式
 SENTENCE_END_PUNCTUATIONS = r"[。？！；\.\?\!\;]"
 
-load_dotenv()
+# load_dotenv()  # 移除，使用主系统配置
 
 API_KEY = config.TTS_API_KEY # 统一配置
 PORT = config.TTS_PORT

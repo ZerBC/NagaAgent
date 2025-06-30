@@ -55,10 +55,10 @@ def check_windows_specific():
     # 检查 Visual C++ Build Tools
     try:
         result = subprocess.run(['cl'], capture_output=True, text=True)
-        vcpp_ok = result.returncode == 0 or "Microsoft" in result.stderr
+        handoffp_ok = result.returncode == 0 or "Microsoft" in result.stderr
     except FileNotFoundError:
-        vcpp_ok = False
-    print_status("Visual C++ Build Tools", vcpp_ok)
+        handoffp_ok = False
+    print_status("Visual C++ Build Tools", handoffp_ok)
     
     return powershell_ok and win_browser_found
 
@@ -140,7 +140,6 @@ def main():
         "OpenAI": "openai", 
         "Requests": "requests",
         "NumPy": "numpy",
-        "Faiss": "faiss",
         "Transformers": "transformers",
         "Playwright": "playwright",
         "python-dotenv": "dotenv"
@@ -148,7 +147,7 @@ def main():
     
     for display_name, package_name in packages.items():
         pkg_ok = check_python_package(package_name)
-        if display_name in ["PyQt5", "OpenAI", "Requests", "NumPy", "Faiss"]:
+        if display_name in ["PyQt5", "OpenAI", "Requests", "NumPy"]:
             all_good &= print_status(f"{display_name}", pkg_ok)
         else:
             print_status(f"{display_name}", pkg_ok)
@@ -183,9 +182,9 @@ def main():
     venv_ok = os.path.exists(".venv")
     print_status("虚拟环境 (.venv)", venv_ok)
     
-    # 检查模型文件
-    model_ok = os.path.exists("models/text2vec-base-chinese")
-    print_status("中文向量模型", model_ok)
+    # 检查GRAG记忆系统
+    grag_ok = os.path.exists("summer_memory")
+    print_status("GRAG记忆系统", grag_ok)
     
     print()
     print("⚙️  配置检查:")

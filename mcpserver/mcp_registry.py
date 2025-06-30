@@ -130,6 +130,22 @@ HANDOFF_SCHEMAS = [
         "agent_name": "WeatherTime Agent",
         "strict_schema": False
     },
+    {
+        "service_name": "grag_memory",
+        "tool_name": "grag_memory_handoff",
+        "tool_description": "GRAG知识图谱记忆管理",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "description": "操作类型（query/stats/clear/extract）"},
+                "question": {"type": "string", "description": "查询问题（query操作需要）"},
+                "text": {"type": "string", "description": "要提取的文本（extract操作需要）"}
+            },
+            "required": ["action"]
+        },
+        "agent_name": "GRAG Memory Agent",
+        "strict_schema": False
+    },
 ]
 
 # 删除shell相关schema

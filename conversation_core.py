@@ -1,6 +1,6 @@
 import logging,os,asyncio # 日志与系统
 from datetime import datetime # 时间
-from config import LOG_DIR,DEEPSEEK_API_KEY,DEEPSEEK_MODEL,TEMPERATURE,MAX_TOKENS,get_current_datetime,THEME_ROOTS,DEEPSEEK_BASE_URL,NAGA_SYSTEM_PROMPT,VOICE_ENABLED,GRAG_ENABLED # 配置
+from config import LOG_DIR, DEEPSEEK_API_KEY, DEEPSEEK_MODEL, TEMPERATURE, MAX_TOKENS, get_current_datetime, DEEPSEEK_BASE_URL, NAGA_SYSTEM_PROMPT, VOICE_ENABLED, GRAG_ENABLED # 配置
 from mcpserver.mcp_manager import get_mcp_manager, remove_tools_filter, HandoffInputData # 多功能管理
 from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX # handoff提示词
 from mcpserver.agent_playwright_master import PlaywrightAgent, extract_url # 导入浏览器相关类
@@ -16,6 +16,8 @@ import json
 import websockets 
 import re # 添加re模块导入
 from typing import List, Dict # 修复List未导入
+from thinking import TreeThinkingEngine # 树状思考引擎
+from thinking.config import COMPLEX_KEYWORDS # 复杂关键词
 
 # GRAG记忆系统导入
 if GRAG_ENABLED:
@@ -58,6 +60,14 @@ class NagaConversation: # 对话主类
         self.memory_manager = memory_manager
         if self.memory_manager:
             logger.info("夏园记忆系统已初始化")
+        
+        # 集成树状思考系统
+        try:
+            self.tree_thinking = TreeThinkingEngine(api_client=self, memory_manager=self.memory_manager)
+            logger.info("树状外置思考系统初始化成功")
+        except Exception as e:
+            logger.warning(f"树状思考系统初始化失败: {e}")
+            self.tree_thinking = None
         
         global _MCP_HANDOFF_REGISTERED
         if not _MCP_HANDOFF_REGISTERED:
@@ -150,7 +160,7 @@ class NagaConversation: # 对话主类
     async def handle_tool_call_loop(self, messages: List[Dict], is_streaming: bool = False) -> Dict:
         """处理工具调用循环"""
         recursion_depth = 0
-        max_recursion = int(os.getenv('MaxVCPLoopStream', '5')) if is_streaming else int(os.getenv('MaxVCPLoopNonStream', '5'))
+        max_recursion = int(os.getenv('MaxhandoffLoopStream', '5')) if is_streaming else int(os.getenv('MaxhandoffLoopNonStream', '5'))
         current_messages = messages.copy()
         current_ai_content = ''
         while recursion_depth < max_recursion:
@@ -212,6 +222,67 @@ class NagaConversation: # 对话主类
 
             print(f"GTP请求发送：{now()}")  # AI请求前
             
+            # 树状思考系统控制指令
+            if u.strip().startswith("#tree"):
+                if self.tree_thinking is None:
+                    yield ("娜迦", "树状思考系统未初始化，无法使用该功能");return
+                command = u.strip().split()
+                if len(command) == 2:
+                    if command[1] == "on":
+                        self.tree_thinking.enable_tree_thinking(True)
+                        yield ("娜迦", "🌳 树状外置思考系统已启用");return
+                    elif command[1] == "off":
+                        self.tree_thinking.enable_tree_thinking(False)
+                        yield ("娜迦", "树状思考系统已禁用，恢复普通对话模式");return
+                    elif command[1] == "status":
+                        status = self.tree_thinking.get_system_status()
+                        enabled_status = "启用" if status["enabled"] else "禁用"
+                        yield ("娜迦", f"🌳 树状思考系统状态：{enabled_status}\n当前会话：{status['current_session']}\n历史会话数：{status['total_sessions']}");return
+                yield ("娜迦", "用法：#tree on/off/status");return
+            
+            # 检查是否需要自动触发树状思考
+            tree_thinking_enabled = False
+            if hasattr(self, 'tree_thinking') and self.tree_thinking and getattr(self.tree_thinking, 'is_enabled', False):
+                question_lower = u.lower()
+                complex_count = sum(1 for keyword in COMPLEX_KEYWORDS if keyword in question_lower)
+                if complex_count >= 1 or len(u) > 50:
+                    tree_thinking_enabled = True
+                    logger.info(f"检测到复杂问题，启用树状思考 - 复杂关键词: {complex_count}, 长度: {len(u)}")
+                    matched_keywords = [keyword for keyword in COMPLEX_KEYWORDS if keyword in question_lower]
+                    logger.info(f"匹配的关键词: {matched_keywords}")
+                else:
+                    logger.info(f"未触发树状思考 - 复杂关键词: {complex_count}, 长度: {len(u)}")
+
+            # 新增：树状思考处理
+            if tree_thinking_enabled:
+                try:
+                    yield ("娜迦", "🌳 检测到复杂问题，启动树状外置思考系统...")
+                    thinking_result = await self.tree_thinking.think_deeply(u)
+                    if thinking_result and "answer" in thinking_result:
+                        process_info = thinking_result.get("thinking_process", {})
+                        difficulty = process_info.get("difficulty", {})
+                        yield ("娜迦", f"\n🧠 深度思考完成：")
+                        yield ("娜迦", f"• 问题难度：{difficulty.get('difficulty', 'N/A')}/5")
+                        yield ("娜迦", f"• 思考路线：{process_info.get('routes_generated', 0)}条 → {process_info.get('routes_selected', 0)}条")
+                        yield ("娜迦", f"• 处理时间：{process_info.get('processing_time', 0):.2f}秒")
+                        yield ("娜迦", f"\n{thinking_result['answer']}")
+                        final_answer = thinking_result['answer']
+                        self.messages += [{"role": "user", "content": u}, {"role": "assistant", "content": final_answer}]
+                        self.save_log(u, final_answer)
+
+                        # GRAG记忆存储（开发者模式不写入）
+                        if self.memory_manager and not self.dev_mode:
+                            try:
+                                await self.memory_manager.add_conversation_memory(u, final_answer)
+                            except Exception as e:
+                                logger.error(f"GRAG记忆存储失败: {e}")
+                        return
+                    else:
+                        yield ("娜迦", "🌳 树状思考处理异常，切换到普通模式...")
+                except Exception as e:
+                    logger.error(f"树状思考处理失败: {e}")
+                    yield ("娜迦", f"🌳 树状思考系统出错，切换到普通模式: {str(e)}")
+                    
             # 只走工具调用循环
             try:
                 result = await self.handle_tool_call_loop(msgs, is_streaming=True)
@@ -229,8 +300,8 @@ class NagaConversation: # 对话主类
                 self.messages += [{"role": "user", "content": u}, {"role": "assistant", "content": final_content}]
                 self.save_log(u, final_content)
                 
-                # GRAG记忆存储
-                if self.memory_manager:
+                # GRAG记忆存储（开发者模式不写入）
+                if self.memory_manager and not self.dev_mode:
                     try:
                         await self.memory_manager.add_conversation_memory(u, final_content)
                     except Exception as e:
@@ -247,6 +318,20 @@ class NagaConversation: # 对话主类
             traceback.print_exc(file=sys.stderr)
             yield ("娜迦", f"[MCP异常]: {e}")
             return
+
+    async def get_response(self, prompt: str, temperature: float = 0.7) -> str:
+        """为树状思考系统等提供API调用接口""" # 统一接口
+        try:
+            response = await self.async_client.chat.completions.create(
+                model=DEEPSEEK_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=temperature,
+                max_tokens=MAX_TOKENS
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.error(f"API调用失败: {e}")
+            return f"API调用出错: {str(e)}"
 
 async def process_user_message(s,msg):
     if VOICE_ENABLED and not msg: #无文本输入时启动语音识别

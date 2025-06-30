@@ -1,9 +1,9 @@
 import logging
 import asyncio
 from typing import List, Dict, Optional, Tuple
-from extractor_ds_tri import extract_triples
-from graph import store_triples, query_graph_by_keywords, get_all_triples
-from rag_query_tri import query_knowledge, set_context
+from .extractor_ds_tri import extract_triples
+from .graph import store_triples, query_graph_by_keywords, get_all_triples
+from .rag_query_tri import query_knowledge, set_context
 import config
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class GRAGMemoryManager:
             
         try:
             # 初始化Neo4j连接
-            from graph import graph
+            from .graph import graph
             logger.info("GRAG记忆系统初始化成功")
         except Exception as e:
             logger.error(f"GRAG记忆系统初始化失败: {e}")

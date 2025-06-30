@@ -1,8 +1,6 @@
-# 一键配置脚本 for NagaAgent 2.1 (极致码高尔夫)
+# 一键配置脚本 for NagaAgent 3.0 (极致码高尔夫)
 # 版本号由config.py统一管理
 $ErrorActionPreference = "Stop" # 设置错误时停止执行
-$modelPath = "models/text2vec-base-chinese" # 模型路径
-$modelRepo = "shibing624/text2vec-base-chinese" # 模型仓库名
 $pythonMinVersion = "3.8" # Python最低版本要求
 $venvPath = ".venv" # 虚拟环境路径
 
@@ -44,12 +42,6 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 Write-Host "Playwright版本: $playwrightVersion"
-
-# 检查并下载模型
-if (-not (Test-Path $modelPath)) {
-    Write-Host "下载模型中..."
-    python -c "from huggingface_hub import snapshot_download; snapshot_download('$modelRepo', local_dir='$modelPath')"
-}
 
 Write-Host "环境设置完成！"
 Write-Host "如需安装其他浏览器驱动，请运行:"

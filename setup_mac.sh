@@ -1,11 +1,9 @@
 #!/bin/bash
-# 一键配置脚本 for NagaAgent 2.2beta (Mac 版本)
+# 一键配置脚本 for NagaAgent 3.0 (Mac 版本)
 # 版本号由config.py统一管理
 
 set -e  # 设置错误时停止执行
 
-MODEL_PATH="models/text2vec-base-chinese"  # 模型路径
-MODEL_REPO="shibing624/text2vec-base-chinese"  # 模型仓库名
 PYTHON_MIN_VERSION="3.8"  # Python最低版本要求
 VENV_PATH=".venv"  # 虚拟环境路径
 
@@ -110,12 +108,6 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 print_success "Playwright 版本: $PLAYWRIGHT_VERSION"
-
-# 检查并下载模型
-if [[ ! -d "$MODEL_PATH" ]]; then
-    print_info "下载中文向量模型..."
-    python -c "from huggingface_hub import snapshot_download; snapshot_download('$MODEL_REPO', local_dir='$MODEL_PATH')"
-fi
 
 # 创建启动脚本
 print_info "创建启动脚本..."

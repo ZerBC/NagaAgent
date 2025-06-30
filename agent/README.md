@@ -16,10 +16,10 @@
 - **环境变量**: `{{Tarxxx}}`, `{{Varxxx}}` - 环境变量替换
 - **时间日期**: `{{Date}}`, `{{Time}}`, `{{Today}}` - 时间信息
 - **静态插件**: 支持各种静态占位符
-- **VCP工具**: `{{VCPAllTools}}`, `{{VCPWeatherInfo}}` - 工具描述
+- **handoff工具**: `{{handoffAllTools}}`, `{{handoffWeatherInfo}}` - 工具描述
 - **表情包**: `{{xxx表情包}}` - 表情包列表
 - **日记本**: `{{xxx日记本}}` - 角色日记内容
-- **异步结果**: `{{VCP_ASYNC_RESULT::plugin::id}}` - 异步任务结果
+- **异步结果**: `{{handoff_ASYNC_RESULT::plugin::id}}` - 异步任务结果
 
 ## 项目结构
 
@@ -63,8 +63,8 @@ PORT=8000
 DEBUG=False
 
 # 工具调用循环限制
-MaxVCPLoopStream=5
-MaxVCPLoopNonStream=5
+MaxhandoffLoopStream=5
+MaxhandoffLoopNonStream=5
 ```
 
 ## 启动服务器

@@ -7,7 +7,7 @@ sys.path.append(os.path.dirname(__file__))
 from ui.pyqt_chat_window import ChatWindow
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtGui import QIcon
-from summer.memory_manager import MemoryManager
+from summer_memory.memory_manager import memory_manager
 
 # 导入API服务器配置
 from config import (
@@ -80,8 +80,7 @@ def start_api_server():
         print(f"❌ API服务器启动异常: {e}")
 
 with open('./ui/progress.txt','w')as f:f.write('0')
-mm = MemoryManager()
-threading.Thread(target=mm.forget_long_term, daemon=True).start()  # 启动时异步清理一次
+mm = memory_manager
 
 print('='*30+'\n娜迦系统已启动\n'+'='*30)
 

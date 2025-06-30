@@ -155,7 +155,7 @@ class MCPWebSocketManager:
     def _authenticate_client(self, path: str) -> bool:
         """认证客户端"""
         # 简单的路径认证，可以扩展为更复杂的认证机制
-        return 'VCP_Key=' in path
+        return 'handoff_Key=' in path
         
     async def _send_to_client(self, client: WebSocketClient, data: Dict):
         """发送消息到客户端"""

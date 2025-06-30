@@ -340,7 +340,7 @@ class ElegantSettingsWidget(QWidget):
         
         # 语音功能
         voice_checkbox = QCheckBox()
-        voice_checkbox.setChecked(False)
+        voice_checkbox.setChecked(getattr(config, 'VOICE_ENABLED', False))
         voice_checkbox.setStyleSheet(self.get_checkbox_style())
         voice_card = SettingCard(
             "语音交互",

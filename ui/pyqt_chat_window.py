@@ -300,7 +300,28 @@ class WebSocketThread(QThread):
         """停止线程"""
         self.running = False
         if self.client.websocket:
-            asyncio.create_task(self.client.disconnect())
+            try:
+                # 使用同步方式关闭WebSocket，避免事件循环问题
+                import asyncio
+                try:
+                    # 尝试在现有事件循环中运行
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        # 如果事件循环正在运行，使用call_soon_threadsafe
+                        loop.call_soon_threadsafe(lambda: asyncio.create_task(self.client.disconnect()))
+                    else:
+                        # 如果事件循环没有运行，直接运行
+                        asyncio.run(self.client.disconnect())
+                except RuntimeError:
+                    # 如果没有事件循环，创建一个新的
+                    asyncio.run(self.client.disconnect())
+            except Exception as e:
+                print(f"关闭WebSocket时出错: {e}")
+                # 强制关闭连接
+                try:
+                    self.client.websocket.close()
+                except:
+                    pass
 
 class ChatWindow(QWidget):
     def __init__(s):
@@ -949,28 +970,12 @@ class ChatWindow(QWidget):
     def on_websocket_status(s, connected, status):
         """处理WebSocket连接状态"""
         try:
-            if connected:
-                # 连接成功 - 显示绿色状态
-                status_message = f'<div style="color: #4CAF50; font-weight: bold; margin: 5px 0;">🔗 {status}</div>'
-            else:
-                # 连接失败或断开 - 显示红色状态
-                status_message = f'<div style="color: #F44336; font-weight: bold; margin: 5px 0;">❌ {status}</div>'
-            
-            # 添加时间戳
-            timestamp = datetime.datetime.now().strftime('%H:%M:%S')
-            timestamp_html = f'<span style="color: #666; font-size: 12px;">[{timestamp}]</span> '
-            
-            # 将状态消息添加到聊天历史
-            s.text.append(timestamp_html + status_message)
-            
-            # 滚动到底部
-            s.text.verticalScrollBar().setValue(s.text.verticalScrollBar().maximum())
-            
+            # 只在控制台打印，不显示在聊天窗口
             print(f"🔗 WebSocket状态: {connected} - {status}")
-            
+            return
         except Exception as e:
             print(f"❌ 处理WebSocket状态时出错: {e}")
-    
+
     def closeEvent(s, event):
         """窗口关闭事件"""
         # 停止WebSocket线程

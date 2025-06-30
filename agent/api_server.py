@@ -166,7 +166,7 @@ class AgentAPIServer:
         
         # 处理工具调用循环
         recursion_depth = 0
-        max_recursion = int(os.getenv('MaxVCPLoopStream', '5'))
+        max_recursion = int(os.getenv('MaxhandoffLoopStream', '5'))
         current_messages = original_body.get('messages', [])
         current_ai_content = ''
         
@@ -214,7 +214,7 @@ class AgentAPIServer:
             
             # 处理工具调用循环（非流式）
             recursion_depth = 0
-            max_recursion = int(os.getenv('MaxVCPLoopNonStream', '5'))
+            max_recursion = int(os.getenv('MaxhandoffLoopNonStream', '5'))
             current_messages = original_body.get('messages', [])
             current_ai_content = response_json.get('choices', [{}])[0].get('message', {}).get('content', '')
             

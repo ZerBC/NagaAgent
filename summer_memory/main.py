@@ -1,7 +1,7 @@
-from extractor_ds_tri import extract_triples
-from graph import store_triples
-from visualize import visualize_triples
-from rag_query_tri import query_knowledge, set_context
+from .extractor_ds_tri import extract_triples
+from .graph import store_triples
+from .visualize import visualize_triples
+from .rag_query_tri import query_knowledge, set_context
 import os
 import logging
 import traceback

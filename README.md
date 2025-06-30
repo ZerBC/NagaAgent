@@ -1,4 +1,4 @@
-# NagaAgent 2.3
+# NagaAgent 3.0
 
 > 智能对话助手，支持多MCP服务、流式语音交互、主题树检索、RESTful API接口、极致精简代码风格。
 
@@ -118,6 +118,7 @@ API_SERVER_AUTO_START = True  # 启动时自动启动API服务器
 - faiss向量数据库，HNSW+PQ混合索引，异步加速，动态调整深度，权重动态调整，自动清理
 - **TOOL_REQUEST工具调用循环**，自动解析和执行LLM返回的工具调用，支持多轮递归调用
 - **多Agent能力扩展：浏览器、文件、代码等多种Agent即插即用，所有Agent均可通过工具调用循环机制统一调用**
+- **GRAG知识图谱记忆系统**，基于Neo4j的三元组知识图谱，自动提取对话中的实体关系，支持记忆查询和管理
 - **跨平台兼容：Windows/Mac自动适配，浏览器路径自动检测，依赖智能安装**
 - 代码极简，注释全中文，组件解耦，便于扩展
 - PyQt5动画与UI，支持PNG序列帧，loading动画极快
@@ -164,6 +165,14 @@ NagaAgent/
 │   ├── faiss_index.py          # faiss索引管理
 │   ├── embedding.py            # 向量编码
 │   ├── memory_flow/            # 记忆分层相关
+│   ├── GRAG/                   # GRAG知识图谱记忆系统
+│   │   ├── memory_manager.py   # 记忆管理器
+│   │   ├── extractor_ds_tri.py # 三元组提取器
+│   │   ├── graph.py            # Neo4j图谱操作
+│   │   ├── rag_query_tri.py    # 记忆查询
+│   │   ├── visualize.py        # 图谱可视化
+│   │   ├── main.py             # 独立运行入口
+│   │   └── triples.json        # 三元组缓存
 │   └── summer_upgrade/         # 兼容升级相关脚本
 │       └── compat_txt_to_faiss.py # 历史对话兼容主脚本
 ├── logs/                       # 日志（含历史txt对话）
@@ -207,9 +216,9 @@ param2: 「始」参数值2「末」
 ### 配置参数
 ```python
 # config.py中的工具调用循环配置
-MAX_VCP_LOOP_STREAM = 5      # 流式模式最大工具调用循环次数
-MAX_VCP_LOOP_NON_STREAM = 5  # 非流式模式最大工具调用循环次数
-SHOW_VCP_OUTPUT = False      # 是否显示工具调用输出
+MAX_handoff_LOOP_STREAM = 5      # 流式模式最大工具调用循环次数
+MAX_handoff_LOOP_NON_STREAM = 5  # 非流式模式最大工具调用循环次数
+SHOW_handoff_OUTPUT = False      # 是否显示工具调用输出
 ```
 
 ### 使用示例
@@ -323,7 +332,7 @@ await s.mcp.handoff(
 - 无法访问：检查防火墙设置，确保端口未被阻塞
 
 ### 工具调用问题
-- 工具调用循环次数过多：调整`config.py`中的`MAX_VCP_LOOP_STREAM`和`MAX_VCP_LOOP_NON_STREAM`
+- 工具调用循环次数过多：调整`config.py`中的`MAX_handoff_LOOP_STREAM`和`MAX_handoff_LOOP_NON_STREAM`
 - 工具调用失败：检查MCP服务是否正常运行，查看日志输出
 - 格式错误：确保LLM输出严格遵循TOOL_REQUEST格式
 
@@ -397,9 +406,9 @@ param2: 「始」参数值2「末」
 ### 配置参数
 ```python
 # config.py中的工具调用循环配置
-MAX_VCP_LOOP_STREAM = 5      # 流式模式最大工具调用循环次数
-MAX_VCP_LOOP_NON_STREAM = 5  # 非流式模式最大工具调用循环次数
-SHOW_VCP_OUTPUT = False      # 是否显示工具调用输出
+MAX_handoff_LOOP_STREAM = 5      # 流式模式最大工具调用循环次数
+MAX_handoff_LOOP_NON_STREAM = 5  # 非流式模式最大工具调用循环次数
+SHOW_handoff_OUTPUT = False      # 是否显示工具调用输出
 ```
 
 ### 错误处理
