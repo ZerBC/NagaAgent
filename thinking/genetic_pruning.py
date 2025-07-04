@@ -40,7 +40,7 @@ class GeneticPruning:
         self.generations: List[ThinkingGeneration] = []
         self.current_generation = 0
         
-        logger.info("遗传算法剪枝系统初始化完成")
+        print("[TreeThinkingEngine] 🧬 遗传算法剪枝系统初始化完成")
     
     async def evolve_thinking_tree(self, initial_nodes: List[ThinkingNode], 
                                   target_count: int = 3) -> List[ThinkingNode]:

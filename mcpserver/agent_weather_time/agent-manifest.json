@@ -1,0 +1,49 @@
+{
+  "name": "WeatherTimeAgent",
+  "displayName": "天气时间Agent",
+  "version": "1.0.0",
+  "description": "支持天气查询、时间查询，自动识别城市和IP。",
+  "author": "Naga团队",
+  "agentType": "synchronous",
+  "entryPoint": {
+    "module": "mcpserver.agent_weather_time.agent_weather_time",
+    "class": "WeatherTimeAgent"
+  },
+  "communication": {
+    "protocol": "stdio",
+    "timeout": 15000
+  },
+  "capabilities": {
+    "invocationCommands": [
+      {
+        "command": "weather",
+        "description": "查询天气信息。\n- `action`: 固定为 `weather`\n- `city`: 城市名（可选，自动识别）\n- `query`: 查询内容（如'明天天气'、'最高温'等）\n**调用示例:**\n```json\n{\"action\": \"weather\", \"city\": \"北京\", \"query\": \"明天天气\"}```",
+        "example": "{\"action\": \"weather\", \"city\": \"北京\", \"query\": \"明天天气\"}"
+      },
+      {
+        "command": "time",
+        "description": "查询当前时间。\n- `action`: 固定为 `time`\n- `city`: 城市名（可选，自动识别）\n**调用示例:**\n```json\n{\"action\": \"time\", \"city\": \"上海\"}```",
+        "example": "{\"action\": \"time\", \"city\": \"上海\"}"
+      },
+      {
+        "command": "current_weather",
+        "description": "查询当前天气。\n- `action`: 固定为 `current_weather`\n- `city`: 城市名（可选，自动识别）\n**调用示例:**\n```json\n{\"action\": \"current_weather\", \"city\": \"广州\"}```",
+        "example": "{\"action\": \"current_weather\", \"city\": \"广州\"}"
+      }
+    ]
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "action": {"type": "string", "description": "操作类型，如weather/time/current_weather"},
+      "city": {"type": "string", "description": "城市名（可选，自动识别）"},
+      "ip": {"type": "string", "description": "用户IP（可选，自动获取）"},
+      "query": {"type": "string", "description": "查询内容（weather时可选）"},
+      "format": {"type": "string", "description": "格式类型（可选）"}
+    },
+    "required": ["action"]
+  },
+  "configSchema": {
+    "WEATHER_AGENT_DEFAULT_CITY": "string"
+  }
+} 

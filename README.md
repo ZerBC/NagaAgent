@@ -1,6 +1,6 @@
 # NagaAgent 3.0
 
-> 智能对话助手，支持多MCP服务、流式语音交互、主题树检索、RESTful API接口、极致精简代码风格。
+> 智能对话助手，支持多MCP服务、流式语音交互、GRAG知识图谱记忆系统、RESTful API接口、极致精简代码风格。
 
 ---
 
@@ -22,8 +22,8 @@
    ./quick_deploy_mac.sh
    ```
    - 自动创建虚拟环境并安装依赖
-   - 检查/下载中文向量模型
    - 配置支持toolcall的LLM，推荐DeepSeekV3
+   - 初始化GRAG知识图谱记忆系统
 3. 启动
 
    **Windows:**
@@ -85,6 +85,12 @@
 python check_env.py
 ```
 
+### 依赖清理（可选）
+如果之前安装过faiss相关依赖，可以运行清理脚本：
+```bash
+python cleanup_dependencies.py
+```
+
 ---
 
 ## ⚙️ 配置说明
@@ -104,6 +110,18 @@ API_SERVER_PORT = 8000  # API服务器端口
 API_SERVER_AUTO_START = True  # 启动时自动启动API服务器
 ```
 
+### GRAG知识图谱记忆系统配置
+在 `config.py` 中可配置GRAG记忆系统：
+```python
+GRAG_ENABLED = True  # 是否启用GRAG记忆系统
+GRAG_AUTO_EXTRACT = True  # 是否自动提取对话中的三元组
+GRAG_CONTEXT_LENGTH = 5  # 记忆上下文长度
+GRAG_SIMILARITY_THRESHOLD = 0.6  # 记忆检索相似度阈值
+GRAG_NEO4J_URI = "neo4j://127.0.0.1:7687"  # Neo4j连接URI
+GRAG_NEO4J_USER = "neo4j"  # Neo4j用户名
+GRAG_NEO4J_PASSWORD = "your_password"  # Neo4j密码
+```
+
 ### 获取 DeepSeek API 密钥
 1. 访问 [DeepSeek 官网](https://platform.deepseek.com/)
 2. 注册账号并创建 API 密钥
@@ -114,11 +132,10 @@ API_SERVER_AUTO_START = True  # 启动时自动启动API服务器
 ## 🌟 主要特性
 - **全局变量/路径/密钥统一`config.py`管理**，支持.env和环境变量，所有变量唯一、无重复定义
 - **RESTful API接口**，自动启动HTTP服务器，支持完整对话功能和流式输出，可集成到任何前端或服务
-- DeepSeek流式对话，支持上下文召回与主题树分片检索
-- faiss向量数据库，HNSW+PQ混合索引，异步加速，动态调整深度，权重动态调整，自动清理
+- DeepSeek流式对话，支持上下文召回与GRAG知识图谱检索
+- **GRAG知识图谱记忆系统**，基于Neo4j的三元组知识图谱，自动提取对话中的实体关系，支持记忆查询和管理
 - **TOOL_REQUEST工具调用循环**，自动解析和执行LLM返回的工具调用，支持多轮递归调用
 - **多Agent能力扩展：浏览器、文件、代码等多种Agent即插即用，所有Agent均可通过工具调用循环机制统一调用**
-- **GRAG知识图谱记忆系统**，基于Neo4j的三元组知识图谱，自动提取对话中的实体关系，支持记忆查询和管理
 - **跨平台兼容：Windows/Mac自动适配，浏览器路径自动检测，依赖智能安装**
 - 代码极简，注释全中文，组件解耦，便于扩展
 - PyQt5动画与UI，支持PNG序列帧，loading动画极快
@@ -159,34 +176,26 @@ NagaAgent/
 ├── setup_mac.sh                # Mac配置脚本
 ├── quick_deploy_mac.sh         # Mac一键部署脚本
 ├── check_env.py                # 跨平台环境检查
-├── summer/                     # faiss与向量相关
-│   ├── memory_manager.py       # 记忆管理主模块
-│   ├── summer_faiss.py         # faiss相关操作
-│   ├── faiss_index.py          # faiss索引管理
-│   ├── embedding.py            # 向量编码
-│   ├── memory_flow/            # 记忆分层相关
-│   ├── GRAG/                   # GRAG知识图谱记忆系统
-│   │   ├── memory_manager.py   # 记忆管理器
-│   │   ├── extractor_ds_tri.py # 三元组提取器
-│   │   ├── graph.py            # Neo4j图谱操作
-│   │   ├── rag_query_tri.py    # 记忆查询
-│   │   ├── visualize.py        # 图谱可视化
-│   │   ├── main.py             # 独立运行入口
-│   │   └── triples.json        # 三元组缓存
-│   └── summer_upgrade/         # 兼容升级相关脚本
-│       └── compat_txt_to_faiss.py # 历史对话兼容主脚本
+├── cleanup_dependencies.py     # 依赖清理脚本
+├── summer_memory/              # GRAG知识图谱记忆系统
+│   ├── memory_manager.py       # 记忆管理器
+│   ├── extractor_ds_tri.py     # 三元组提取器
+│   ├── graph.py                # Neo4j图谱操作
+│   ├── rag_query_tri.py        # 记忆查询
+│   ├── visualize.py            # 图谱可视化
+│   ├── main.py                 # 独立运行入口
+│   └── triples.json            # 三元组缓存
 ├── logs/                       # 日志（含历史txt对话）
 │   ├── 2025-04-27.txt
 │   ├── 2025-05-05.txt
-│   ├── ...
-│   └── faiss/                  # faiss索引与元数据
+│   └── ...
 ├── voice/                      # 语音相关
 │   ├── voice_config.py
 │   └── voice_handler.py
 ├── ui/                         # 前端UI
 │   ├── pyqt_chat_window.py     # PyQt聊天窗口
 │   └── response_utils.py       # 前端通用响应解析工具
-├── models/                     # 向量模型等
+├── models/                     # 模型等
 ├── README.md                   # 项目说明
 └── ...
 ```
@@ -282,28 +291,28 @@ await s.mcp.handoff(
 ## 📝 其它亮点
 - 记忆权重、遗忘阈值、冗余去重、短期/长期记忆容量等全部在`config.py`统一管理，便于灵活调整
 - 主题归类、召回、权重提升、清理等全部自动化，AI/人工可标记important内容，重要内容一年内不会被清理
-- 检索日志自动记录，参数可调，faiss配置示例见`config.py`
+- 检索日志自动记录，参数可调，GRAG配置示例见`config.py`
 - 聊天窗口背景透明度、用户名、主题树召回、流式输出、侧栏动画等全部可自定义
-- 支持历史对话一键导入AI多层记忆系统，兼容主题、分层、embedding等所有新特性
+- 支持历史对话一键导入GRAG知识图谱记忆系统，兼容主题、分层、三元组等所有新特性
 - **工具调用循环自动执行机制，支持多轮递归调用，最大循环次数可配置**
 
 ---
 
 ## 🆙 历史对话兼容升级
-- 支持将旧版txt对话内容一键导入AI多层记忆系统，兼容主题、分层、embedding等所有新特性。
+- 支持将旧版txt对话内容一键导入GRAG知识图谱记忆系统，兼容主题、分层、三元组等所有新特性。
 - 激活指令：
   ```
   #夏园系统兼容升级
   ```
-  - 系统会自动遍历logs目录下所有txt日志，列出所有历史对话内容并编号，输出到终端和`summer/summer_upgrade/history_dialogs.json`。
+  - 系统会自动遍历logs目录下所有txt日志，列出所有历史对话内容并编号，输出到终端和`summer_memory/history_dialogs.json`。
 - 用户可查看编号后，选择导入方式：
   - 全部导入：
     ```
-    python summer/summer_upgrade/compat_txt_to_faiss.py import all
+    python summer_memory/main.py import all
     ```
   - 选择性导入（如第1、3、5-8条）：
     ```
-    python summer/summer_upgrade/compat_txt_to_faiss.py import 1,3,5-8
+    python summer_memory/main.py import 1,3,5-8
     ```
 - 兼容过程自动判重，已入库内容不会重复导入，支持断点续跑。
 - 兼容内容全部走AI自动主题归类与分层，完全与新系统一致。
@@ -336,10 +345,15 @@ await s.mcp.handoff(
 - 工具调用失败：检查MCP服务是否正常运行，查看日志输出
 - 格式错误：确保LLM输出严格遵循TOOL_REQUEST格式
 
+### GRAG记忆系统问题
+- Neo4j连接失败：检查Neo4j服务是否启动，确认连接参数正确
+- 记忆查询无结果：检查三元组是否正确提取和存储
+- 性能问题：调整`config.py`中的GRAG相关参数
+
 ### 通用问题
 - 浏览器无法启动，检查playwright安装与网络
 - 主题树/索引/参数/密钥全部在`config.py`统一管理
-- 聊天输入`#devmode`进入开发者模式，后续对话不写入faiss，仅用于工具调用测试
+- 聊天输入`#devmode`进入开发者模式，后续对话不写入GRAG记忆，仅用于工具调用测试
 
 ---
 
@@ -356,8 +370,8 @@ MIT License
 
 ## 智能历史召回机制
 1. 默认按主题分片检索历史，极快且相关性高。
-2. 若分片查不到，自动兜底遍历所有主题分片模糊检索（faiss_fuzzy_recall），话题跳跃也能召回历史。
-3. faiss_fuzzy_recall支持直接调用，返回全局最相关历史。
+2. 若分片查不到，自动兜底遍历所有主题分片模糊检索，话题跳跃也能召回历史。
+3. GRAG知识图谱查询支持直接调用，返回全局最相关历史。
 4. 兜底逻辑已集成主流程，无需手动切换。
 
 ## ⚡️ 全新流式输出机制
@@ -467,121 +481,20 @@ POST /system/devmode
 
 # 获取记忆统计
 GET /memory/stats
+``` 
 
-# 获取MCP服务列表
-GET /mcp/services
+## MCP服务Agent化升级说明
 
-# 调用MCP服务
-POST /mcp/handoff
-{
-  "service_name": "file",
-  "task": {
-    "action": "read",
-    "path": "test.txt"
-  }
-}
-```
+- 所有MCP服务（如文件、代码、浏览器、应用启动、系统控制、天气等）已全部升级为标准Agent风格：
+  - 统一继承自`agents.Agent`，具备`name`、`instructions`属性和`handle_handoff`异步方法
+  - 变量全部走`config.py`统一管理，避免重复定义
+  - 注释全部中文，文件/类/函数注释一行，变量注释右侧#
+  - 支持多agent协作，ControllerAgent可智能分配任务给BrowserAgent、ContentAgent等
+  - 注册中心`mcp_registry.py`自动发现并注册所有实现了`handle_handoff`的Agent实例，支持热插拔
+  - 注册时自动输出所有已注册agent的名称和说明，便于调试
 
-### API使用示例
+- handoff机制全部通过`handle_handoff`异步方法调度，兼容TOOL_REQUEST和handoff两种格式
 
-#### curl命令
-```bash
-# 基本对话
-curl -X POST "http://127.0.0.1:8000/chat" \
-     -H "Content-Type: application/json" \
-     -d '{"message": "你好，娜迦"}'
+- 新增/删除agent只需增删py文件，无需重启主程序
 
-# 流式对话
-curl -X POST "http://127.0.0.1:8000/chat/stream" \
-     -H "Content-Type: application/json" \
-     -d '{"message": "请介绍一下人工智能"}' \
-     --no-buffer
-```
-
-### API错误处理
-
-API使用标准HTTP状态码：
-- `200` - 成功
-- `400` - 请求参数错误
-- `500` - 服务器内部错误
-- `503` - 服务不可用
-
-### 代理环境配置
-
-如果您的环境中配置了代理（如SOCKS代理），测试本地API时可能需要临时禁用：
-
-```bash
-# 临时禁用代理
-unset ALL_PROXY http_proxy https_proxy
-
-# 然后测试API
-curl http://127.0.0.1:8000/health
-```
-
----
-
-### 本地应用启动与管理（AppLauncher Agent）
-
-#### 功能简介
-- 支持通过MCP自动打开电脑上的任意应用（如微信、WPS、网易云音乐等），无需手动配置应用路径。
-- 自动扫描并缓存所有本机可用应用（包括开始菜单快捷方式、注册表、Applications等），支持智能模糊匹配和别名自学习。
-- 兼容Windows、Mac、Linux，支持.lnk快捷方式和.exe等可执行文件。
-
-#### 支持的操作
-- `open`：打开指定应用
-- `list`：列出所有可用应用
-- `refresh`：刷新应用缓存
-
-#### 参数说明
-| 参数名   | 类型   | 说明                 | 是否必填 |
-|----------|--------|----------------------|----------|
-| action   | string | 操作类型（open/list/refresh） | 是       |
-| app      | string | 应用名或路径（open时必填）   | 否       |
-| args     | array  | 启动参数（可选）           | 否       |
-
-#### 用法示例
-- 打开微信：
-  ```json
-  {"action": "open", "app": "微信"}
-  ```
-- 列出所有可用应用：
-  ```json
-  {"action": "list"}
-  ```
-- 刷新应用缓存：
-  ```json
-  {"action": "refresh"}
-  ```
-
-#### 智能适配说明
-- 支持拼音、英文、别名、模糊匹配等多策略查找，极大提升容错率。
-- 用户每次成功打开后，系统会自动记录"用户说法→真实应用名"映射，越用越准。
-- 支持.lnk快捷方式自动用系统方式打开，.exe等可执行文件用subprocess启动。
-
-#### 常见问题与注意事项
-- 如果"未找到应用"，请先用`list`操作确认缓存中真实的应用名。
-- 新安装应用后请先`refresh`再`open`。
-- Windows下建议将常用应用快捷方式放到开始菜单，便于自动识别。
-- 仅支持明确的action（open/list/refresh），其他操作会被拒绝。
-
-## 工具调用机制
-
-本系统仅支持如下格式的工具调用循环：
-
-```
-<<<[TOOL_REQUEST]>>>
-tool_name: 「始」服务名称「末」
-param1: 「始」参数值1「末」
-param2: 「始」参数值2「末」
-<<<[END_TOOL_REQUEST]>>>
-```
-
-如无需调用工具，直接回复message字段内容即可。
-
-- LLM每次输出可包含多个TOOL_REQUEST块，系统会自动循环解析和执行，直到无工具调用为止。
-- 不再支持plan结构的多步分解，所有多步任务请LLM分多轮TOOL_REQUEST实现。
-
-## 主要功能
-- 智能对话与工具调用循环
-- 插件化消息预处理与图片处理
-- API代理与MCP服务集成 
+- 详细接口和参数请参考各Agent代码注释与`config.py`配置 

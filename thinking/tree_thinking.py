@@ -16,6 +16,14 @@ from .config import TREE_THINKING_CONFIG
 
 logger = logging.getLogger("TreeThinkingEngine")
 
+# 全局子系统实例，避免重复初始化
+_global_subsystems = {
+    "difficulty_judge": None,
+    "preference_filter": None,
+    "genetic_pruning": None,
+    "thread_pool": None
+}
+
 class TreeThinkingEngine:
     """树状思考核心引擎"""
     
@@ -24,18 +32,31 @@ class TreeThinkingEngine:
         self.memory_manager = memory_manager
         self.config = TREE_THINKING_CONFIG
         
-        # 初始化子系统
-        self.difficulty_judge = DifficultyJudge(api_client)
-        self.preference_filter = PreferenceFilter(api_client)
-        self.genetic_pruning = GeneticPruning(api_client)
-        self.thread_pool = ThreadPoolManager()
+        # 初始化或复用子系统（参考handoff的全局变量保护机制）
+        global _global_subsystems
+        
+        # 初始化子系统（只在第一次创建时初始化）
+        if _global_subsystems["difficulty_judge"] is None:
+            _global_subsystems["difficulty_judge"] = DifficultyJudge(api_client)
+            _global_subsystems["preference_filter"] = PreferenceFilter(api_client)
+            _global_subsystems["genetic_pruning"] = GeneticPruning(api_client)
+            _global_subsystems["thread_pool"] = ThreadPoolManager()
+            print("[TreeThinkingEngine] 🌳 树状思考引擎子系统初始化完成")
+            print("[TreeThinkingEngine] 🚀 树状思考引擎初始化完成")
+        else:
+            # 复用时不播报，避免重复日志
+            pass
+        
+        # 使用全局子系统实例
+        self.difficulty_judge = _global_subsystems["difficulty_judge"]
+        self.preference_filter = _global_subsystems["preference_filter"]
+        self.genetic_pruning = _global_subsystems["genetic_pruning"]
+        self.thread_pool = _global_subsystems["thread_pool"]
         
         # 运行状态
         self.is_enabled = self.config["enabled"]
         self.current_session = None
         self.thinking_history = []
-        
-        logger.info("树状思考引擎初始化完成")
     
     async def think_deeply(self, question: str, user_preferences: Optional[List[UserPreference]] = None) -> Dict[str, Any]:
         """

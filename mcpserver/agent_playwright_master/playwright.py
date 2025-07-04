@@ -6,6 +6,8 @@ from typing import Literal, Union, Optional, Any, Dict, List, Tuple
 from dataclasses import dataclass, asdict
 from .message_filter import filter_messages
 from .playwright_search import search_web, SearchEngine
+from .controller import PlaywrightController  # 控制器 #
+from .browser import PlaywrightBrowser  # 浏览器观察器 #
 
 print=lambda *a,**k:sys.stderr.write('[print] '+(' '.join(map(str,a)))+'\n')
 
@@ -339,67 +341,40 @@ class PlaywrightAgent(Agent):
         sys.stderr.write('✅ PlaywrightAgent初始化完成\n')
 
     async def handle_handoff(self, data: dict) -> str:
-        """智能处理handoff请求：支持url直达、query自动识别网址或搜索并打开第一个结果，并支持按selector输入/点击"""
+        """智能处理handoff请求，控制与观察分离 #"""
         try:
-            # 修复中文编码问题
-            data_json = json.dumps(data, ensure_ascii=False)
-            sys.stderr.write(f'收到handoff请求数据: {data_json}\n'.encode('utf-8', errors='replace').decode('utf-8'))
+            data_json = json.dumps(data, ensure_ascii=False)  #
+            sys.stderr.write(f'收到handoff请求数据: {data_json}\n'.encode('utf-8', errors='replace').decode('utf-8'))  #
             if not isinstance(data, dict):
-                raise ValueError(f"无效的数据格式: {type(data)}")
-            
-            action = data.get("action", "")
-            url = data.get("url")
-            query = data.get("query")
-            selector = data.get("selector")
-            text = data.get("text")
-            timeout = int(data.get("timeout", 30000))
-            wait_until = data.get("wait_until", "domcontentloaded")
-            
-            # 处理特殊action
-            if action == "reboot_browser":
-                # 重启浏览器
-                try:
-                    if LocalPlaywrightComputer._global_browser:
-                        await LocalPlaywrightComputer._global_browser.close()
-                    if LocalPlaywrightComputer._global_playwright:
-                        await LocalPlaywrightComputer._global_playwright.stop()
-                    LocalPlaywrightComputer._global_browser = None
-                    LocalPlaywrightComputer._global_playwright = None
-                    return json.dumps({
-                        'status': 'ok',
-                        'message': '浏览器已重启',
-                        'data': {}
-                    }, ensure_ascii=False)
-                except Exception as e:
-                    return json.dumps({
-                        'status': 'error',
-                        'message': f'重启浏览器失败: {e}',
-                        'data': {}
-                    }, ensure_ascii=False)
-            
-            # 支持action=open或action=open_browser，直接打开url
-            if action in ["open", "open_browser"] and url:
-                if not url.startswith(('http://', 'https://')):
-                    url = 'https://' + url
-                sys.stderr.write(f'直接打开URL: {url}\n')
+                raise ValueError(f"无效的数据格式: {type(data)}")  #
+            action = data.get("action", "")  #
+            url = data.get("url")  #
+            query = data.get("query")  #
+            selector = data.get("selector")  #
+            text = data.get("text")  #
+            timeout = int(data.get("timeout", 30000))  #
+            wait_until = data.get("wait_until", "domcontentloaded")  #
+            # 控制类action #
+            if action in ["open", "open_browser", "type", "click"]:
                 async with LocalPlaywrightComputer() as computer:
-                    result = await computer.open_url(url, timeout=timeout, wait_until=wait_until)
+                    controller = PlaywrightController(computer.page)  #
+                    if action in ["open", "open_browser"] and url:
+                        if not url.startswith(('http://', 'https://')):
+                            url = 'https://' + url  #
+                        result = await controller.open_url(url, timeout=timeout, wait_until=wait_until)  #
                     response = {
                         'status': 'ok' if result == 'ok' else 'error',
                         'message': result if result != 'ok' else '打开成功',
                         'query': query if query else url,
                         'data': {
-                            'url': computer.context.url,
-                            'page_title': computer.context.page_title,
-                            'page_content_length': len(computer.context.page_content)
+                                'url': url,
+                                'page_title': await computer.page.title(),
+                                'page_content_length': len(await computer.page.content())
                         }
                     }
-                return json.dumps(response, ensure_ascii=False)
-            
-            # 支持action=type，优先selector输入
+                        return json.dumps(response, ensure_ascii=False)  #
             if action == "type" and selector and text is not None:
-                async with LocalPlaywrightComputer() as computer:
-                    result = await computer.type_by_selector(selector, text)
+                        result = await controller.type(selector, text)  #
                     response = {
                         'status': 'ok' if result == 'ok' else 'error',
                         'message': result if result == 'ok' else f'输入失败: {result}',
@@ -409,12 +384,9 @@ class PlaywrightAgent(Agent):
                             'text': text
                         }
                     }
-                return json.dumps(response, ensure_ascii=False)
-            
-            # 支持action=click，优先selector点击
+                        return json.dumps(response, ensure_ascii=False)  #
             if action == "click" and selector:
-                async with LocalPlaywrightComputer() as computer:
-                    result = await computer.click_by_selector(selector)
+                        result = await controller.click(selector)  #
                     response = {
                         'status': 'ok' if result == 'ok' else 'error',
                         'message': result if result == 'ok' else f'点击失败: {result}',
@@ -423,84 +395,87 @@ class PlaywrightAgent(Agent):
                             'selector': selector
                         }
                     }
-                return json.dumps(response, ensure_ascii=False)
-            
-            # 兼容原有url/query/搜索逻辑
-            # 优先url
+                        return json.dumps(response, ensure_ascii=False)  #
+            # 观察类action #
+            if action in ["get_content", "get_title", "get_screenshot"]:
+                async with LocalPlaywrightComputer() as computer:
+                    browser = PlaywrightBrowser(computer.page)  #
+                    if action == "get_content":
+                        content = await browser.get_content()  #
+                        return json.dumps({'status': 'ok', 'result': content}, ensure_ascii=False)  #
+                    if action == "get_title":
+                        title = await browser.get_title()  #
+                        return json.dumps({'status': 'ok', 'result': title}, ensure_ascii=False)  #
+                    if action == "get_screenshot":
+                        screenshot = await browser.get_screenshot()  #
+                        return json.dumps({'status': 'ok', 'result': base64.b64encode(screenshot).decode('utf-8')}, ensure_ascii=False)  #
+            # 兼容原有url/query/搜索逻辑 #
             if url:
                 if not url.startswith(('http://', 'https://')):
-                    url = 'https://' + url
-                sys.stderr.write(f'直接打开URL: {url}\n')
+                    url = 'https://' + url  #
                 async with LocalPlaywrightComputer() as computer:
-                    result = await computer.open_url(url, timeout=timeout, wait_until=wait_until)
+                    controller = PlaywrightController(computer.page)  #
+                    result = await controller.open_url(url, timeout=timeout, wait_until=wait_until)  #
                     response = {
                         'status': 'ok' if result == 'ok' else 'error',
                         'message': result if result != 'ok' else '打开成功',
                         'query': query if query else url,
                         'data': {
-                            'url': computer.context.url,
-                            'page_title': computer.context.page_title,
-                            'page_content_length': len(computer.context.page_content)
+                            'url': url,
+                            'page_title': await computer.page.title(),
+                            'page_content_length': len(await computer.page.content())
                         }
                     }
-                return json.dumps(response, ensure_ascii=False)
-            
-            # 其次query
+                return json.dumps(response, ensure_ascii=False)  #
             if query:
-                # 判断是否为网址
-                url2 = extract_url(query)
+                url2 = extract_url(query)  #
                 if url2:
                     if not url2.startswith(('http://', 'https://')):
-                        url2 = 'https://' + url2
-                    sys.stderr.write(f'query被识别为网址，自动打开: {url2}\n'.encode('utf-8', errors='replace').decode('utf-8'))
+                        url2 = 'https://' + url2  #
                     async with LocalPlaywrightComputer() as computer:
-                        result = await computer.open_url(url2, timeout=timeout, wait_until=wait_until)
+                        controller = PlaywrightController(computer.page)  #
+                        result = await controller.open_url(url2, timeout=timeout, wait_until=wait_until)  #
                         response = {
                             'status': 'ok' if result == 'ok' else 'error',
                             'message': result if result != 'ok' else '打开成功',
                             'query': query,
                             'data': {
-                                'url': computer.context.url,
-                                'page_title': computer.context.page_title,
-                                'page_content_length': len(computer.context.page_content)
+                                'url': url2,
+                                'page_title': await computer.page.title(),
+                                'page_content_length': len(await computer.page.content())
                             }
                         }
-                    return json.dumps(response, ensure_ascii=False)
-                # 否则视为搜索内容
-                engine = data.get("engine", "")
+                    return json.dumps(response, ensure_ascii=False)  #
+                engine = data.get("engine", "")  #
                 if not engine:
-                    engine = "google" # 默认使用google
-                sys.stderr.write(f'query被视为搜索内容，执行搜索: {query}, engine={engine}\n'.encode('utf-8', errors='replace').decode('utf-8'))
-                search_result = await search_web(query, engine)
-                # 自动打开第一个结果
+                    engine = "google"  #
+                search_result = await search_web(query, engine)  #
                 if search_result.get("status") == "ok" and search_result.get("data", {}).get("results"):
-                    first_result = search_result["data"]["results"][0]
-                    url3 = first_result.get("url")
+                    first_result = search_result["data"]["results"][0]  #
+                    url3 = first_result.get("url")  #
                     if url3:
-                        sys.stderr.write(f'自动打开搜索第一个结果: {url3}\n'.encode('utf-8', errors='replace').decode('utf-8'))
                         async with LocalPlaywrightComputer() as computer:
-                            result = await computer.open_url(url3, timeout=timeout, wait_until=wait_until)
+                            controller = PlaywrightController(computer.page)  #
+                            result = await controller.open_url(url3, timeout=timeout, wait_until=wait_until)  #
                             if result == 'ok':
-                                search_result["data"]["opened_url"] = url3
-                                search_result["data"]["page_title"] = computer.context.page_title
-                                search_result["data"]["page_content_length"] = len(computer.context.page_content)
-                search_result["query"] = query
-                return json.dumps(search_result, ensure_ascii=False)
-            
-            # 兜底
+                                search_result["data"]["opened_url"] = url3  #
+                                search_result["data"]["page_title"] = await computer.page.title()  #
+                                search_result["data"]["page_content_length"] = len(await computer.page.content())  #
+                search_result["query"] = query  #
+                return json.dumps(search_result, ensure_ascii=False)  #
             return json.dumps({
                 'status': 'error',
                 'message': '未提供有效的url、query或action',
                 'data': {}
-            }, ensure_ascii=False)
+            }, ensure_ascii=False)  #
         except Exception as e:
-            sys.stderr.write(f'handle_handoff异常: {e}\n'.encode('utf-8', errors='replace').decode('utf-8'))
-            import traceback;traceback.print_exc(file=sys.stderr)
+            sys.stderr.write(f'handle_handoff异常: {e}\n'.encode('utf-8', errors='replace').decode('utf-8'))  #
+            import traceback;traceback.print_exc(file=sys.stderr)  #
             return json.dumps({
                 'status': 'error',
                 'message': str(e),
                 'data': {}
-            }, ensure_ascii=False)
+            }, ensure_ascii=False)  #
 
 def extract_url(text: str) -> str:
     """从文本中提取URL，仅正则判断，不做常见网站名称映射"""

@@ -44,7 +44,7 @@ class ThreadPoolManager:
             "api_errors": 0
         }
         
-        logger.info(f"线程池初始化完成 - 思考池:{config['thinking_pool_size']} API池:{config['api_pool_size']}")
+        print(f"[TreeThinkingEngine] 🔄 线程池初始化完成 - 思考池:{config['thinking_pool_size']} API池:{config['api_pool_size']}")
     
     async def submit_thinking_task(self, func: Callable, *args, **kwargs) -> Any:
         """提交思考任务到思考线程池"""

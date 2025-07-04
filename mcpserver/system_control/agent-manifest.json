@@ -1,0 +1,40 @@
+{
+  "name": "SystemControlAgent",
+  "displayName": "系统控制Agent",
+  "version": "1.0.0",
+  "description": "支持系统控制：定时关机、屏幕亮度调节、音量调节。",
+  "agentType": "synchronous",
+  "entryPoint": {
+    "module": "mcpserver.system_control.agent_system_control",
+    "class": "SystemControlAgent"
+  },
+  "capabilities": {
+    "invocationCommands": [
+      {
+        "command": "shutdown",
+        "description": "定时关机。\n- `action`: 固定为 `shutdown`\n- `time`: 定时关机秒数（可选，默认0立即）\n- `confirm`: 关机确认（Y/N，第二次调用时必需）\n**调用示例:**\n```json\n{\"action\": \"shutdown\", \"time\": 60}```",
+        "example": "{\"action\": \"shutdown\", \"time\": 60}"
+      },
+      {
+        "command": "set_brightness",
+        "description": "设置屏幕亮度。\n- `action`: 固定为 `set_brightness`\n- `value`: 亮度值（0-100）\n**调用示例:**\n```json\n{\"action\": \"set_brightness\", \"value\": 80}```",
+        "example": "{\"action\": \"set_brightness\", \"value\": 80}"
+      },
+      {
+        "command": "set_volume",
+        "description": "设置系统音量。\n- `action`: 固定为 `set_volume`\n- `value`: 音量值（0-100）\n**调用示例:**\n```json\n{\"action\": \"set_volume\", \"value\": 50}```",
+        "example": "{\"action\": \"set_volume\", \"value\": 50}"
+      }
+    ]
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "action": {"type": "string", "description": "操作类型，如shutdown/set_brightness/set_volume"},
+      "time": {"type": "integer", "description": "定时关机秒数（shutdown时可选）"},
+      "value": {"type": "integer", "description": "亮度或音量值（0-100，set_brightness/set_volume时必需）"},
+      "confirm": {"type": "string", "description": "关机确认（Y/N，shutdown第二次调用时必需）"}
+    },
+    "required": ["action"]
+  }
+} 

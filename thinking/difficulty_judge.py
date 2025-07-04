@@ -27,7 +27,7 @@ class DifficultyJudge:
             "ai_assessment": 0.15     # AI深度评估
         }
         
-        logger.info("问题难度判断器初始化完成")
+        print("[TreeThinkingEngine] 🎯 问题难度判断器初始化完成")
     
     async def assess_difficulty(self, question: str) -> Dict:
         """评估问题难度"""

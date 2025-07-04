@@ -3,7 +3,7 @@ from datetime import datetime # 时间
 from config import LOG_DIR, DEEPSEEK_API_KEY, DEEPSEEK_MODEL, TEMPERATURE, MAX_TOKENS, get_current_datetime, DEEPSEEK_BASE_URL, NAGA_SYSTEM_PROMPT, VOICE_ENABLED, GRAG_ENABLED # 配置
 from mcpserver.mcp_manager import get_mcp_manager, remove_tools_filter, HandoffInputData # 多功能管理
 from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX # handoff提示词
-from mcpserver.agent_playwright_master import PlaywrightAgent, extract_url # 导入浏览器相关类
+from mcpserver.agent_playwright_master import ControllerAgent, BrowserAgent, ContentAgent # 导入浏览器相关类
 from openai import OpenAI,AsyncOpenAI # LLM
 import difflib # 模糊匹配
 import sys,json,traceback
@@ -23,8 +23,7 @@ from thinking.config import COMPLEX_KEYWORDS # 复杂关键词
 if GRAG_ENABLED:
     try:
         from summer_memory.memory_manager import memory_manager
-        logger = logging.getLogger("NagaConversation")
-        logger.info("夏园记忆系统已加载")
+
     except Exception as e:
         logger = logging.getLogger("NagaConversation")
         logger.error(f"夏园记忆系统加载失败: {e}")
@@ -47,6 +46,7 @@ logging.basicConfig(
 logger = logging.getLogger("NagaConversation")
 
 _MCP_HANDOFF_REGISTERED=False
+_TREE_THINKING_SUBSYSTEMS_INITIALIZED=False
 
 class NagaConversation: # 对话主类
     def __init__(self):
@@ -56,18 +56,29 @@ class NagaConversation: # 对话主类
         self.client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL.rstrip('/') + '/')
         self.async_client = AsyncOpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL.rstrip('/') + '/')
         
-        # 初始化GRAG记忆系统
+        # 初始化GRAG记忆系统（只在首次初始化时显示日志）
         self.memory_manager = memory_manager
-        if self.memory_manager:
+        if self.memory_manager and not hasattr(self.__class__, '_memory_initialized'):
             logger.info("夏园记忆系统已初始化")
+            self.__class__._memory_initialized = True
         
-        # 集成树状思考系统
-        try:
-            self.tree_thinking = TreeThinkingEngine(api_client=self, memory_manager=self.memory_manager)
-            logger.info("树状外置思考系统初始化成功")
-        except Exception as e:
-            logger.warning(f"树状思考系统初始化失败: {e}")
-            self.tree_thinking = None
+        # 集成树状思考系统（参考handoff的全局变量保护机制）
+        global _TREE_THINKING_SUBSYSTEMS_INITIALIZED
+        if not _TREE_THINKING_SUBSYSTEMS_INITIALIZED:
+            try:
+                self.tree_thinking = TreeThinkingEngine(api_client=self, memory_manager=self.memory_manager)
+                print("[TreeThinkingEngine] ✅ 树状外置思考系统初始化成功")
+                _TREE_THINKING_SUBSYSTEMS_INITIALIZED = True
+            except Exception as e:
+                logger.warning(f"树状思考系统初始化失败: {e}")
+                self.tree_thinking = None
+        else:
+            # 如果子系统已经初始化过，创建新实例但不重新初始化子系统（静默处理）
+            try:
+                self.tree_thinking = TreeThinkingEngine(api_client=self, memory_manager=self.memory_manager)
+            except Exception as e:
+                logger.warning(f"树状思考系统实例创建失败: {e}")
+                self.tree_thinking = None
         
         global _MCP_HANDOFF_REGISTERED
         if not _MCP_HANDOFF_REGISTERED:

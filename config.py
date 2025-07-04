@@ -63,6 +63,7 @@ STREAM_MODE = True # 是否流式响应
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-placeholder-key-not-set") # 从环境变量获取API密钥
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+MODEL_NAME = DEEPSEEK_MODEL  # 统一模型名称 #
 
 # 确保API密钥是纯ASCII字符串
 if DEEPSEEK_API_KEY:

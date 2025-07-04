@@ -20,7 +20,6 @@ from config import (
 
 # 新增：导入应用预加载
 from mcpserver.agent_open_launcher.app_cache import preload_apps, get_cached_apps
-
 n=NagaConversation()
 def show_help():print('系统命令: 清屏, 查看索引, 帮助, 退出')
 def show_index():print('主题分片索引已集成，无需单独索引查看')
@@ -130,7 +129,7 @@ threading.Thread(target=loop.run_forever,daemon=True).start()
 asyncio.run_coroutine_threadsafe(n._init_websocket(), loop)
 
 class NagaAgentAdapter:
- def __init__(s):s.naga=NagaConversation()
+ def __init__(s):s.naga=NagaConversation()  # 第二次初始化：NagaAgentAdapter构造函数中创建
  async def respond_stream(s,txt):
      async for resp in s.naga.process(txt):
          yield "娜迦",resp,None,True,False

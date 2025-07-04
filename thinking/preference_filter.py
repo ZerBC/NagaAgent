@@ -85,7 +85,7 @@ class PreferenceFilter:
         ]
         
         self.user_preferences = self.default_preferences.copy()
-        logger.info("偏好打分系统初始化完成")
+        print("[TreeThinkingEngine] ⭐ 偏好打分系统初始化完成")
     
     def update_preferences(self, new_preferences: List[UserPreference]):
         """更新用户偏好配置"""

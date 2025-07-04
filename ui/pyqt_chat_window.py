@@ -494,7 +494,7 @@ class ChatWindow(QWidget):
         main.addWidget(s.main_splitter)
         
         s.nick=nick
-        s.naga=NagaConversation()
+        s.naga=NagaConversation()  # 第三次初始化：ChatWindow构造函数中创建
         s.worker=None
         s.full_img=0 # 立绘展开标志
         s.streaming_mode = True  # 默认启用流式模式

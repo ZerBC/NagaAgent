@@ -1,0 +1,37 @@
+{
+  "name": "AppLauncherAgent",
+  "displayName": "智能应用启动Agent",
+  "version": "1.0.0",
+  "description": "智能应用启动助手，应用列表已预加载到prompt中，直接让LLM判断选择。",
+  "author": "Naga团队",
+  "agentType": "synchronous",
+  "entryPoint": {
+    "module": "mcpserver.agent_open_launcher.agent_app_launcher",
+    "class": "AppLauncherAgent"
+  },
+  "communication": {
+    "protocol": "stdio",
+    "timeout": 15000
+  },
+  "capabilities": {
+    "invocationCommands": [
+      {
+        "command": "launch",
+        "description": "根据用户需求启动应用。\n- `user_request`: 用户需求描述（如'我想写文档'、'打开浏览器'等）\n- `query`: 查询内容（可选，与user_request相同）\n- `prompt`: 提示内容（可选，与user_request相同）\n**调用示例:**\n```json\n{\"user_request\": \"我想写文档\"}```",
+        "example": "{\"user_request\": \"我想写文档\"}"
+      }
+    ]
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "user_request": {"type": "string", "description": "用户需求描述"},
+      "query": {"type": "string", "description": "查询内容（可选）"},
+      "prompt": {"type": "string", "description": "提示内容（可选）"}
+    },
+    "required": ["user_request"]
+  },
+  "configSchema": {
+    "APP_LAUNCHER_AGENT_CACHE_SIZE": "integer"
+  }
+} 

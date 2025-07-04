@@ -60,7 +60,7 @@ async def lifespan(app: FastAPI):
     global naga_agent
     try:
         print("🚀 正在初始化NagaAgent...")
-        naga_agent = NagaConversation()
+        naga_agent = NagaConversation()  # 第四次初始化：API服务器启动时创建
         print("✅ NagaAgent初始化完成")
         yield
     except Exception as e:

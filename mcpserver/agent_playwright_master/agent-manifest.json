@@ -1,0 +1,67 @@
+{
+  "name": "ControllerAgent",
+  "displayName": "浏览器控制Agent",
+  "version": "1.0.0",
+  "description": "三层Agent架构的浏览器自动化系统，智能调度BrowserAgent和ContentAgent。",
+  "author": "Naga团队",
+  "agentType": "synchronous",
+  "entryPoint": {
+    "module": "mcpserver.agent_playwright_master.agent_controller",
+    "class": "ControllerAgent"
+  },
+  "communication": {
+    "protocol": "stdio",
+    "timeout": 20000
+  },
+  "capabilities": {
+    "invocationCommands": [
+      {
+        "command": "open",
+        "description": "打开指定URL。\n- `action`: 固定为 `open`\n- `url`: 要访问的URL\n- `task_type`: 任务类型（browser/content/complex）\n**调用示例:**\n```json\n{\"action\": \"open\", \"url\": \"https://www.google.com\"}```",
+        "example": "{\"action\": \"open\", \"url\": \"https://www.google.com\"}"
+      },
+      {
+        "command": "click",
+        "description": "点击页面元素。\n- `action`: 固定为 `click`\n- `selector`: CSS选择器\n- `task_type`: 任务类型（browser/content/complex）\n**调用示例:**\n```json\n{\"action\": \"click\", \"selector\": \"#search-button\"}```",
+        "example": "{\"action\": \"click\", \"selector\": \"#search-button\"}"
+      },
+      {
+        "command": "type",
+        "description": "在输入框中输入文本。\n- `action`: 固定为 `type`\n- `selector`: CSS选择器\n- `text`: 输入文本\n- `task_type`: 任务类型（browser/content/complex）\n**调用示例:**\n```json\n{\"action\": \"type\", \"selector\": \"#search-input\", \"text\": \"hello\"}```",
+        "example": "{\"action\": \"type\", \"selector\": \"#search-input\", \"text\": \"hello\"}"
+      },
+      {
+        "command": "get_content",
+        "description": "获取页面内容。\n- `action`: 固定为 `get_content`\n- `task_type`: 任务类型（content）\n**调用示例:**\n```json\n{\"action\": \"get_content\"}```",
+        "example": "{\"action\": \"get_content\"}"
+      },
+      {
+        "command": "get_title",
+        "description": "获取页面标题。\n- `action`: 固定为 `get_title`\n- `task_type`: 任务类型（content）\n**调用示例:**\n```json\n{\"action\": \"get_title\"}```",
+        "example": "{\"action\": \"get_title\"}"
+      },
+      {
+        "command": "get_screenshot",
+        "description": "获取页面截图。\n- `action`: 固定为 `get_screenshot`\n- `task_type`: 任务类型（content）\n**调用示例:**\n```json\n{\"action\": \"get_screenshot\"}```",
+        "example": "{\"action\": \"get_screenshot\"}"
+      }
+    ]
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "action": {"type": "string", "description": "操作类型，如open/click/type/get_content/get_title/get_screenshot"},
+      "url": {"type": "string", "description": "要访问的URL（open时必需）"},
+      "selector": {"type": "string", "description": "CSS选择器（click/type时必需）"},
+      "text": {"type": "string", "description": "输入文本（type时必需）"},
+      "query": {"type": "string", "description": "原始查询文本"},
+      "messages": {"type": "array", "description": "对话历史"},
+      "source": {"type": "string", "description": "请求来源"},
+      "task_type": {"type": "string", "description": "任务类型（browser/content/complex），用于智能分配"}
+    },
+    "required": ["action"]
+  },
+  "configSchema": {
+    "CONTROLLER_AGENT_TIMEOUT": "integer"
+  }
+} 
