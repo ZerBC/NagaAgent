@@ -9,7 +9,6 @@ import os
 import sys
 import platform
 import subprocess
-from pathlib import Path
 
 def print_status(message, status):
     """打印状态信息"""

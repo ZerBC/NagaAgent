@@ -1,17 +1,13 @@
-import sys, os
+import sys
+import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))  # 加入项目根目录到模块查找路径
 # utils.py
 from flask import request, jsonify
 from functools import wraps
-import os
-# from dotenv import load_dotenv  # 移除，使用主系统配置
-import config  # 使用主系统配置
+from config import config  # 使用统一配置系统
 
-def getenv_bool(name: str, default: bool = False) -> bool:
-    return os.getenv(name, str(default)).lower() in ("yes", "y", "true", "1", "t")
-
-API_KEY = config.TTS_API_KEY # 统一配置
-REQUIRE_API_KEY = getenv_bool('REQUIRE_API_KEY', True)
+API_KEY = config.tts.api_key
+REQUIRE_API_KEY = config.tts.require_api_key
 
 def require_api_key(f):
     @wraps(f)

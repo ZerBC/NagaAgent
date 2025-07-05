@@ -8,14 +8,9 @@ import os
 # 添加项目根目录到路径，以便导入config
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-try:
-    from config import API_KEY, BASE_URL, MODEL
-    API_KEY = API_KEY
-    API_URL = f"{BASE_URL.rstrip('/')}/chat/completions"
-except ImportError:
-    # 如果无法导入config，使用环境变量作为备选
-    API_KEY = os.getenv("API_KEY", "sk-placeholder-key-not-set")
-    API_URL = os.getenv("BASE_URL", "https://api.deepseek.com/v1") + "/chat/completions"
+from config import config
+API_KEY = config.api.api_key
+API_URL = f"{config.api.base_url.rstrip('/')}/chat/completions"
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

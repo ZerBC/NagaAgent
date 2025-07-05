@@ -1,16 +1,9 @@
 from playwright.async_api import async_playwright, Page
 import asyncio, re, json
 from typing import Any, Dict, List
-from config import *  # 配置参数统一管理 #
-import os
-from dotenv import load_dotenv
+from config import config  # 配置参数统一管理 #
 from agents import Agent, AgentHooks, RunContextWrapper
 from .browser import PlaywrightBrowser
-
-load_dotenv()
-API_KEY    = os.getenv("API_KEY")
-BASE_URL   = os.getenv("BASE_URL")
-MODEL_NAME = os.getenv("MODEL")
 
 class PlaywrightController:
     """Playwright控制器，负责页面操作、自动化流程等 #"""
@@ -152,5 +145,5 @@ BrowserAgent = Agent(
     instructions="你负责网页自动化操作，如打开、点击、输入、滚动、截图等。",
     tools=[PlaywrightController],
     hooks=BrowserAgentHooks(),
-    model=MODEL_NAME
+    model=config.api.model
 ) 

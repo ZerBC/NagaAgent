@@ -3,20 +3,19 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))  # 加入项目根�
 import asyncio
 import json
 import re
-# from dotenv import load_dotenv  # 移除，使用主系统配置
 import base64
 import tempfile
 import librosa
 import soundfile as sf
 from handle_text import prepare_tts_input_with_context
 from tts_handler import generate_speech, get_models, get_voices
-from utils import getenv_bool, require_api_key, AUDIO_FORMAT_MIME_TYPES
+from utils import require_api_key, AUDIO_FORMAT_MIME_TYPES
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 import threading
 import logging
 import uvicorn
-import config  # 使用主系统配置
+from config import config  # 使用统一配置系统
 
 
 # 配置日志
@@ -43,16 +42,15 @@ REQUEST_TIMEOUT = 60  # 请求处理超时（秒）
 # 断句正则表达式
 SENTENCE_END_PUNCTUATIONS = r"[。？！；\.\?\!\;]"
 
-# load_dotenv()  # 移除，使用主系统配置
 
-API_KEY = config.TTS_API_KEY # 统一配置
-PORT = config.TTS_PORT
-DEFAULT_VOICE = config.TTS_DEFAULT_VOICE
-DEFAULT_RESPONSE_FORMAT = getattr(config, 'TTS_DEFAULT_FORMAT', 'wav')
-DEFAULT_SPEED = config.TTS_DEFAULT_SPEED
+API_KEY = config.tts.api_key
+PORT = config.tts.port
+DEFAULT_VOICE = config.tts.default_voice
+DEFAULT_RESPONSE_FORMAT = config.tts.default_format
+DEFAULT_SPEED = config.tts.default_speed
 
-REMOVE_FILTER = getenv_bool('REMOVE_FILTER', False)
-EXPAND_API = getenv_bool('EXPAND_API', True)
+REMOVE_FILTER = config.tts.remove_filter
+EXPAND_API = config.tts.expand_api
 
 app = FastAPI()
 

@@ -23,7 +23,7 @@ import aiohttp
 
 # 导入NagaAgent核心模块
 from conversation_core import NagaConversation
-from config import API_KEY, BASE_URL, MODEL, TEMPERATURE, MAX_TOKENS
+from config import config
 from ui.response_utils import extract_message  # 导入消息提取工具
 
 # 全局NagaAgent实例
@@ -180,7 +180,7 @@ async def get_system_info():
         version="3.0",
         status="running",
         available_services=naga_agent.mcp.list_mcps(),
-        api_key_configured=bool(API_KEY and API_KEY != "sk-placeholder-key-not-set")
+        api_key_configured=bool(config.api.api_key and config.api.api_key != "sk-placeholder-key-not-set")
     )
 
 @app.post("/chat", response_model=ChatResponse)
@@ -203,16 +203,16 @@ async def chat(request: ChatRequest):
             """调用LLM API"""
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f"{BASE_URL}/v1/chat/completions",
+                    f"{config.api.base_url}/v1/chat/completions",
                     headers={
-                        "Authorization": f"Bearer {API_KEY}",
+                        "Authorization": f"Bearer {config.api.api_key}",
                         "Content-Type": "application/json"
                     },
                     json={
-                        "model": MODEL,
+                        "model": config.api.model,
                         "messages": messages,
-                        "temperature": TEMPERATURE,
-                        "max_tokens": MAX_TOKENS,
+                        "temperature": config.api.temperature,
+                        "max_tokens": config.api.max_tokens,
                         "stream": False
                     }
                 ) as resp:
@@ -262,16 +262,16 @@ async def chat_stream(request: ChatRequest):
                 """调用LLM API"""
                 async with aiohttp.ClientSession() as session:
                     async with session.post(
-                        f"{BASE_URL}/v1/chat/completions",
+                        f"{config.api.base_url}/v1/chat/completions",
                         headers={
-                            "Authorization": f"Bearer {API_KEY}",
+                            "Authorization": f"Bearer {config.api.api_key}",
                             "Content-Type": "application/json"
                         },
                         json={
-                            "model": MODEL,
+                            "model": config.api.model,
                             "messages": messages,
-                            "temperature": TEMPERATURE,
-                            "max_tokens": MAX_TOKENS,
+                            "temperature": config.api.temperature,
+                            "max_tokens": config.api.max_tokens,
                             "stream": False
                         }
                     ) as resp:
@@ -436,7 +436,7 @@ async def execute_tool_calls(tool_calls: list, mcp_manager) -> str:
 async def tool_call_loop(messages: list, mcp_manager, llm_caller, is_streaming: bool = False) -> dict:
     """工具调用循环主流程"""
     recursion_depth = 0
-    max_recursion = int(os.getenv('MaxhandoffLoopStream', '5')) if is_streaming else int(os.getenv('MaxhandoffLoopNonStream', '5'))
+    max_recursion = config.handoff.max_loop_stream if is_streaming else config.handoff.max_loop_non_stream
     current_messages = messages.copy()
     current_ai_content = ''
     while recursion_depth < max_recursion:
@@ -463,8 +463,8 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description="NagaAgent API服务器")
-    parser.add_argument("--host", default="127.0.0.1", help="服务器主机地址")
-    parser.add_argument("--port", type=int, default=8000, help="服务器端口")
+    parser.add_argument("--host", default=config.api_server.host, help="服务器主机地址")
+    parser.add_argument("--port", type=int, default=config.api_server.port, help="服务器端口")
     parser.add_argument("--reload", action="store_true", help="开启自动重载")
     
     args = parser.parse_args()

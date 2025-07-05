@@ -1,13 +1,7 @@
-import os
-from dotenv import load_dotenv
 from agents import Agent, AgentHooks, RunContextWrapper
 from .controller import BrowserAgent
 from .browser import ContentAgent
-from config import MODEL_NAME
-
-load_dotenv()
-API_KEY  = os.getenv("API_KEY")
-BASE_URL = os.getenv("BASE_URL")
+from config import config
 
 class ControllerAgentHooks(AgentHooks):
     async def on_start(self, context: RunContextWrapper, agent: Agent):
@@ -24,7 +18,7 @@ class ControllerAgent(Agent):
             name=self.name,
             instructions=self.instructions,
             tools=[],  # 可扩展
-            model=MODEL_NAME
+            model=config.api.model
         )
         # 可选：初始化BrowserAgent/ContentAgent引用
         import sys
@@ -50,5 +44,5 @@ ControllerAgent = Agent(
     instructions="你负责理解用户目标，自动分配任务给BrowserAgent和ContentAgent，并汇总结果。",
     handoffs=[BrowserAgent, ContentAgent],
     hooks=ControllerAgentHooks(),
-    model=MODEL_NAME
+    model=config.api.model
 ) 

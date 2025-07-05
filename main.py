@@ -1,25 +1,20 @@
-import threading
-from conversation_core import NagaConversation
-import os,asyncio
+import asyncio
+import os
 import sys
+import threading
 import time
+
+from conversation_core import NagaConversation
+
 sys.path.append(os.path.dirname(__file__))
-from ui.pyqt_chat_window import ChatWindow
-from PyQt5.QtWidgets import QApplication
 from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import QApplication
+
+# 导入配置
+from config import config
 from summer_memory.memory_manager import memory_manager
+from ui.pyqt_chat_window import ChatWindow
 
-# 导入API服务器配置
-from config import (
-    API_SERVER_ENABLED, 
-    API_SERVER_AUTO_START, 
-    API_SERVER_HOST, 
-    API_SERVER_PORT,
-    TTS_PORT
-)
-
-# 新增：导入应用预加载
-from mcpserver.agent_open_launcher.app_cache import preload_apps, get_cached_apps
 n=NagaConversation()
 def show_help():print('系统命令: 清屏, 查看索引, 帮助, 退出')
 def show_index():print('主题分片索引已集成，无需单独索引查看')
@@ -39,25 +34,25 @@ def start_api_server():
     """在后台启动API服务器"""
     try:
         # 检查端口是否被占用
-        if not check_port_available(API_SERVER_HOST, API_SERVER_PORT):
-            print(f"⚠️ 端口 {API_SERVER_PORT} 已被占用，跳过API服务器启动")
+        if not check_port_available(config.api_server.host, config.api_server.port):
+            print(f"⚠️ 端口 {config.api_server.port} 已被占用，跳过API服务器启动")
             return
             
         import uvicorn
         # 使用字符串路径而不是直接导入，确保模块重新加载
         # from apiserver.api_server import app
         
-        print(f"🚀 正在启动夏园API服务器...")
-        print(f"📍 地址: http://{API_SERVER_HOST}:{API_SERVER_PORT}")
-        print(f"📚 文档: http://{API_SERVER_HOST}:{API_SERVER_PORT}/docs")
+        print("🚀 正在启动夏园API服务器...")
+        print(f"📍 地址: http://{config.api_server.host}:{config.api_server.port}")
+        print(f"📚 文档: http://{config.api_server.host}:{config.api_server.port}/docs")
         
         # 在新线程中启动API服务器
         def run_server():
             try:
                 uvicorn.run(
                     "apiserver.api_server:app",  # 使用字符串路径
-                    host=API_SERVER_HOST,
-                    port=API_SERVER_PORT,
+                    host=config.api_server.host,
+                    port=config.api_server.port,
                     log_level="error",  # 减少日志输出
                     access_log=False,
                     reload=False  # 确保不使用自动重载
@@ -78,13 +73,14 @@ def start_api_server():
     except Exception as e:
         print(f"❌ API服务器启动异常: {e}")
 
-with open('./ui/progress.txt','w')as f:f.write('0')
+with open('./ui/progress.txt','w')as f:
+    f.write('0')
 mm = memory_manager
 
 print('='*30+'\n娜迦系统已启动\n'+'='*30)
 
 # 自动启动API服务器
-if API_SERVER_ENABLED and API_SERVER_AUTO_START:
+if config.api_server.enabled and config.api_server.auto_start:
     start_api_server()
 
 def check_tts_port_available(port):
@@ -100,12 +96,12 @@ def check_tts_port_available(port):
 def start_tts_server():
     """在后台启动TTS服务"""
     try:
-        if not check_tts_port_available(TTS_PORT):
-            print(f"⚠️ 端口 {TTS_PORT} 已被占用，跳过TTS服务启动")
+        if not check_tts_port_available(config.tts.port):
+            print(f"⚠️ 端口 {config.tts.port} 已被占用，跳过TTS服务启动")
             return
         import subprocess
-        print(f"🚀 正在启动TTS服务...")
-        print(f"📍 地址: http://127.0.0.1:{TTS_PORT}")
+        print("🚀 正在启动TTS服务...")
+        print(f"📍 地址: http://127.0.0.1:{config.tts.port}")
         def run_tts():
             try:
                 subprocess.Popen([sys.executable, os.path.join(os.path.dirname(__file__), 'voice', 'server.py')])
