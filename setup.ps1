@@ -26,7 +26,25 @@ if (-not (Test-Path $venvPath)) {
 
 # 安装依赖（用清华源加速）
 Write-Host "安装依赖（使用清华镜像源加速）..."
-Get-ChildItem -Filter "requirements*.txt" | ForEach-Object {
+# 优先使用 pyproject.toml
+if (Test-Path "pyproject.toml") {
+    Write-Host "使用 uv 安装依赖..." -ForegroundColor Green
+    if (Get-Command "uv" -ErrorAction SilentlyContinue) {
+        uv sync
+    } else {
+        Write-Host "未找到 uv，使用 pip 安装..." -ForegroundColor Yellow
+        pip install -e .
+    }
+} elseif (Test-Path "requirements.txt") {
+    Write-Host "使用 requirements.txt 安装依赖..." -ForegroundColor Green
+    pip install -r requirements.txt
+} else {
+    Write-Host "未找到依赖文件，请检查项目配置" -ForegroundColor Red
+    exit 1
+}
+
+# 兼容旧的 requirements 文件扫描（如果存在）
+Get-ChildItem -Filter "requirements*.txt" -ErrorAction SilentlyContinue | ForEach-Object {
     pip install -r $_.FullName -i https://pypi.tuna.tsinghua.edu.cn/simple
 }
 

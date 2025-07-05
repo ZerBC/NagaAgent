@@ -75,7 +75,19 @@ fi
 
 # 安装 Python 依赖
 print_info "安装 Python 依赖..."
-for req_file in requirements*.txt; do
+if [ -f "pyproject.toml" ]; then
+    echo "使用 uv 安装依赖..."
+    uv sync || pip install -e .
+elif [ -f "requirements.txt" ]; then
+    echo "使用 requirements.txt 安装依赖..."
+    pip install -r requirements.txt
+else
+    echo "未找到依赖文件，请检查项目配置"
+    exit 1
+fi
+
+# 兼容旧的 requirements 文件扫描（如果存在）
+for req_file in requirements*.txt 2>/dev/null; do
     if [[ -f "$req_file" ]]; then
         print_info "安装 $req_file..."
         pip install -r "$req_file" -i https://pypi.tuna.tsinghua.edu.cn/simple

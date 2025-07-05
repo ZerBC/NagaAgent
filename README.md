@@ -49,14 +49,20 @@
 ## 🛠️ 依赖安装与环境配置
 
 ### Windows 环境
-- 所有依赖见`requirements.txt`
-- 如遇`greenlet`、`pyaudio`等安装失败，需先装[Microsoft Visual C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)，勾选C++ build tools，重启命令行后再`pip install -r requirements.txt`
+- 所有依赖见`pyproject.toml`
+- 推荐使用 `uv` 作为包管理器，自动处理依赖安装和虚拟环境
+- 如遇`greenlet`、`pyaudio`等安装失败，需先装[Microsoft Visual C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)，勾选C++ build tools
 - 浏览器自动化需`playwright`，首次用需`python -m playwright install chromium`
 - 依赖安装命令：
   ```powershell
+  # 推荐使用 uv（现代化包管理器）
+  uv sync
+  python -m playwright install chromium
+  
+  # 或者使用传统 pip
   python -m venv .venv
   .venv\Scripts\Activate
-  pip install -r requirements.txt
+  pip install -e .
   python -m playwright install chromium
   ```
 
@@ -69,26 +75,25 @@
   ```
 - Python依赖安装：
   ```bash
+  # 推荐使用 uv（现代化包管理器）
+  uv sync
+  python -m playwright install chromium
+  
+  # 或者使用传统 pip
   python3 -m venv .venv
   source .venv/bin/activate
-  pip install -r requirements.txt
+  pip install -e .
   python -m playwright install chromium
   ```
 - 如遇PyAudio安装失败：
   ```bash
   brew install portaudio
-  pip install pyaudio
+  uv sync --extra audio  # 或 pip install pyaudio
   ```
 
 ### 环境检查（跨平台通用）
 ```bash
 python check_env.py
-```
-
-### 依赖清理（可选）
-如果之前安装过faiss相关依赖，可以运行清理脚本：
-```bash
-python cleanup_dependencies.py
 ```
 
 ---
@@ -170,13 +175,12 @@ NagaAgent/
 │   ├── mcp_manager.py          # MCP服务管理
 │   ├── mcp_registry.py         # Agent注册与schema元数据
 │   ├── agent_xxx/              # 各类自定义Agent（如file、coder、browser等）
-├── requirements.txt            # 依赖
+├── pyproject.toml              # 项目配置和依赖
 ├── setup.ps1                   # Windows配置脚本
 ├── start.bat                   # Windows启动脚本
 ├── setup_mac.sh                # Mac配置脚本
 ├── quick_deploy_mac.sh         # Mac一键部署脚本
 ├── check_env.py                # 跨平台环境检查
-├── cleanup_dependencies.py     # 依赖清理脚本
 ├── summer_memory/              # GRAG知识图谱记忆系统
 │   ├── memory_manager.py       # 记忆管理器
 │   ├── extractor_ds_tri.py     # 三元组提取器

@@ -159,7 +159,7 @@ def main():
     files = {
         "配置文件": "config.py",
         "主程序": "main.py", 
-        "依赖列表": "requirements.txt"
+        "依赖列表": "pyproject.toml"
     }
     
     # 系统特定文件
