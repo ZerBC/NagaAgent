@@ -31,7 +31,7 @@ def extract_triples(text):
     }
 
     body = {
-        "model": MODEL,
+        "model": config.api.model,
         "messages": [
             {"role": "user", "content": prompt}
         ],
