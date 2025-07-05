@@ -60,28 +60,28 @@ LOG_DIR = BASE_DIR / "logs"       # 日志目录
 STREAM_MODE = True # 是否流式响应
 
 # API与服务配置
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-placeholder-key-not-set") # 从环境变量获取API密钥
-DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
-DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
-MODEL_NAME = DEEPSEEK_MODEL  # 统一模型名称 #
+API_KEY = os.getenv("API_KEY", "sk-placeholder-key-not-set") # 从环境变量获取API密钥
+BASE_URL = os.getenv("BASE_URL", "https://api.deepseek.com/v1")
+MODEL = os.getenv("MODEL", "deepseek-chat")
+MODEL_NAME = MODEL  # 统一模型名称 #
 
 # 确保API密钥是纯ASCII字符串
-if DEEPSEEK_API_KEY:
+if API_KEY:
     try:
         # 验证API密钥只包含ASCII字符
-        DEEPSEEK_API_KEY.encode('ascii')
+        API_KEY.encode('ascii')
     except UnicodeEncodeError:
         print("错误：API密钥包含非ASCII字符，请检查.env文件")
-        DEEPSEEK_API_KEY = "sk-placeholder-key-not-set"
+        API_KEY = "sk-placeholder-key-not-set"
 
 # 检查API密钥有效性
-if not DEEPSEEK_API_KEY or DEEPSEEK_API_KEY == "sk-placeholder-key-not-set":
-    print("警告：未设置 DEEPSEEK_API_KEY 环境变量或配置文件中的API密钥为空")
-    print("请在 .env 文件中设置: DEEPSEEK_API_KEY=your_api_key")
-    print("或直接修改 config.py 文件中的 DEEPSEEK_API_KEY 值")
+if not API_KEY or API_KEY == "sk-placeholder-key-not-set":
+    print("警告：未设置 API_KEY 环境变量或配置文件中的API密钥为空")
+    print("请在 .env 文件中设置: API_KEY=your_api_key")
+    print("或直接修改 config.py 文件中的 API_KEY 值")
     # 设置一个无害的默认值，避免HTTP头部编码错误
-    if not DEEPSEEK_API_KEY:
-        DEEPSEEK_API_KEY = "sk-placeholder-key-not-set"
+    if not API_KEY:
+        API_KEY = "sk-placeholder-key-not-set"
 
 # API服务器配置
 API_SERVER_ENABLED = True  # 是否启用API服务器

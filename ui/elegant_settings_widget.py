@@ -232,7 +232,7 @@ class ElegantSettingsWidget(QWidget):
             "DeepSeek API Key", 
             "用于连接DeepSeek AI服务的密钥",
             api_key_input,
-            "DEEPSEEK_API_KEY"
+            "API_KEY"
         )
         api_key_card.value_changed.connect(self.on_setting_changed)
         group.add_card(api_key_card)
@@ -245,7 +245,7 @@ class ElegantSettingsWidget(QWidget):
             "API Base URL",
             "DeepSeek API的基础URL地址",
             base_url_input,
-            "DEEPSEEK_BASE_URL"
+            "BASE_URL"
         )
         base_url_card.value_changed.connect(self.on_setting_changed)
         group.add_card(base_url_card)
@@ -259,7 +259,7 @@ class ElegantSettingsWidget(QWidget):
             "AI 模型",
             "选择用于对话的AI模型",
             model_combo,
-            "DEEPSEEK_MODEL"
+            "MODEL"
         )
         model_card.value_changed.connect(self.on_setting_changed)
         group.add_card(model_card)
@@ -586,10 +586,10 @@ class ElegantSettingsWidget(QWidget):
         """加载当前设置"""
         try:
             # API设置
-            self.api_key_input.setText(getattr(config, 'DEEPSEEK_API_KEY', ''))
-            self.base_url_input.setText(getattr(config, 'DEEPSEEK_BASE_URL', 'https://api.deepseek.com/v1'))
+            self.api_key_input.setText(getattr(config, 'API_KEY', ''))
+            self.base_url_input.setText(getattr(config, 'BASE_URL', 'https://api.deepseek.com/v1'))
             
-            model = getattr(config, 'DEEPSEEK_MODEL', 'deepseek-chat')
+            model = getattr(config, 'MODEL', 'deepseek-chat')
             index = self.model_combo.findText(model)
             if index >= 0:
                 self.model_combo.setCurrentIndex(index)
@@ -631,7 +631,7 @@ class ElegantSettingsWidget(QWidget):
             
             for setting_key, value in self.pending_changes.items():
                 try:
-                    if setting_key in ['DEEPSEEK_API_KEY', 'DEEPSEEK_BASE_URL', 'DEEPSEEK_MODEL']:
+                    if setting_key in ['API_KEY', 'BASE_URL', 'MODEL']:
                         # API相关设置保存到.env和config.py
                         env_changes[setting_key] = str(value)
                         success_count += 1

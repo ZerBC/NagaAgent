@@ -23,7 +23,7 @@ import aiohttp
 
 # 导入NagaAgent核心模块
 from conversation_core import NagaConversation
-from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL, TEMPERATURE, MAX_TOKENS
+from config import API_KEY, BASE_URL, MODEL, TEMPERATURE, MAX_TOKENS
 from ui.response_utils import extract_message  # 导入消息提取工具
 
 # 全局NagaAgent实例
@@ -180,7 +180,7 @@ async def get_system_info():
         version="3.0",
         status="running",
         available_services=naga_agent.mcp.list_mcps(),
-        api_key_configured=bool(DEEPSEEK_API_KEY and DEEPSEEK_API_KEY != "sk-placeholder-key-not-set")
+        api_key_configured=bool(API_KEY and API_KEY != "sk-placeholder-key-not-set")
     )
 
 @app.post("/chat", response_model=ChatResponse)
@@ -203,13 +203,13 @@ async def chat(request: ChatRequest):
             """调用LLM API"""
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f"{DEEPSEEK_BASE_URL}/v1/chat/completions",
+                    f"{BASE_URL}/v1/chat/completions",
                     headers={
-                        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                        "Authorization": f"Bearer {API_KEY}",
                         "Content-Type": "application/json"
                     },
                     json={
-                        "model": DEEPSEEK_MODEL,
+                        "model": MODEL,
                         "messages": messages,
                         "temperature": TEMPERATURE,
                         "max_tokens": MAX_TOKENS,
@@ -262,13 +262,13 @@ async def chat_stream(request: ChatRequest):
                 """调用LLM API"""
                 async with aiohttp.ClientSession() as session:
                     async with session.post(
-                        f"{DEEPSEEK_BASE_URL}/v1/chat/completions",
+                        f"{BASE_URL}/v1/chat/completions",
                         headers={
-                            "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                            "Authorization": f"Bearer {API_KEY}",
                             "Content-Type": "application/json"
                         },
                         json={
-                            "model": DEEPSEEK_MODEL,
+                            "model": MODEL,
                             "messages": messages,
                             "temperature": TEMPERATURE,
                             "max_tokens": MAX_TOKENS,

@@ -10,10 +10,10 @@ def read_api_key():
     if os.path.exists(env_path):
         with open(env_path, 'r', encoding='utf-8') as f:
             for line in f:
-                if line.strip().startswith('DEEPSEEK_API_KEY'):
+                if line.strip().startswith('API_KEY'):
                     return line.strip().split('=', 1)[-1].strip()
     # 退回读取config.py
-    return str(getattr(config, 'DEEPSEEK_API_KEY', ''))
+    return str(getattr(config, 'API_KEY', ''))
 
 def write_api_key(new_key):
     # 写入.env
@@ -24,12 +24,12 @@ def write_api_key(new_key):
         with open(env_path, 'r', encoding='utf-8') as f:
             env_lines = f.readlines()
         for i, line in enumerate(env_lines):
-            if line.strip().startswith('DEEPSEEK_API_KEY'):
-                env_lines[i] = f'DEEPSEEK_API_KEY={new_key}\n'
+            if line.strip().startswith('API_KEY'):
+                env_lines[i] = f'API_KEY={new_key}\n'
                 found = True
                 break
     if not found:
-        env_lines.append(f'DEEPSEEK_API_KEY={new_key}\n')
+        env_lines.append(f'API_KEY={new_key}\n')
     with open(env_path, 'w', encoding='utf-8') as f:
         f.writelines(env_lines)
     # 写入config.py
@@ -37,8 +37,8 @@ def write_api_key(new_key):
     with open(config_path, 'r', encoding='utf-8') as f:
         lines = f.readlines()
     for i, line in enumerate(lines):
-        if line.strip().startswith('DEEPSEEK_API_KEY'):
-            lines[i] = f"DEEPSEEK_API_KEY = '{new_key}'\n"
+        if line.strip().startswith('API_KEY'):
+            lines[i] = f"API_KEY = '{new_key}'\n"
             break
     with open(config_path, 'w', encoding='utf-8') as f:
         f.writelines(lines)

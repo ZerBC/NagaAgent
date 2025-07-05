@@ -8,9 +8,9 @@ from agents import Agent, AgentHooks, RunContextWrapper
 from .browser import PlaywrightBrowser
 
 load_dotenv()
-API_KEY = os.getenv("DEEPSEEK_API_KEY")
-BASE_URL = os.getenv("DEEPSEEK_BASE_URL")
-MODEL_NAME = os.getenv("DEEPSEEK_MODEL")
+API_KEY    = os.getenv("API_KEY")
+BASE_URL   = os.getenv("BASE_URL")
+MODEL_NAME = os.getenv("MODEL")
 
 class PlaywrightController:
     """Playwright控制器，负责页面操作、自动化流程等 #"""

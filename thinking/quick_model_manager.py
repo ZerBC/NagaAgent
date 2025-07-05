@@ -22,9 +22,9 @@ from config import (
     RESULT_SCORING_SYSTEM_PROMPT,
     THINKING_COMPLETENESS_SYSTEM_PROMPT,
     NEXT_QUESTION_SYSTEM_PROMPT,
-    DEEPSEEK_API_KEY, 
-    DEEPSEEK_BASE_URL, 
-    DEEPSEEK_MODEL
+    API_KEY, 
+    BASE_URL, 
+    MODEL
 )
 
 logger = logging.getLogger("QuickModelManager")
@@ -51,8 +51,8 @@ class QuickModelManager:
         
         # 备用大模型客户端
         self.fallback_client = AsyncOpenAI(
-            api_key=DEEPSEEK_API_KEY,
-            base_url=DEEPSEEK_BASE_URL.rstrip('/') + '/'
+            api_key=API_KEY,
+            base_url=BASE_URL.rstrip('/') + '/'
         )
         
         # 统计信息
@@ -471,7 +471,7 @@ class QuickModelManager:
     async def _call_fallback_model(self, prompt: str, system_prompt: str) -> str:
         """调用备用大模型"""
         response = await self.fallback_client.chat.completions.create(
-            model=DEEPSEEK_MODEL,
+            model=MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}

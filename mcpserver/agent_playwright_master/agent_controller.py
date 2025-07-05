@@ -6,8 +6,8 @@ from .browser import ContentAgent
 from config import MODEL_NAME
 
 load_dotenv()
-API_KEY = os.getenv("DEEPSEEK_API_KEY")
-BASE_URL = os.getenv("DEEPSEEK_BASE_URL")
+API_KEY  = os.getenv("API_KEY")
+BASE_URL = os.getenv("BASE_URL")
 
 class ControllerAgentHooks(AgentHooks):
     async def on_start(self, context: RunContextWrapper, agent: Agent):

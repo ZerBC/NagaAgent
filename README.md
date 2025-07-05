@@ -103,7 +103,7 @@ python check_env.py
 ### API 密钥配置
 直接修改 `config.py` 文件中的配置：
 ```python
-DEEPSEEK_API_KEY = "<your_deepseek_api>"
+API_KEY = "<your_deepseek_api>"
 ```
 
 ### API服务器配置

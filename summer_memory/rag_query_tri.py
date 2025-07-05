@@ -8,13 +8,13 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 try:
-    from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
-    API_KEY = DEEPSEEK_API_KEY
-    API_URL = f"{DEEPSEEK_BASE_URL.rstrip('/')}/chat/completions"
+    from config import API_KEY, BASE_URL, MODEL
+    API_KEY = API_KEY
+    API_URL = f"{BASE_URL.rstrip('/')}/chat/completions"
 except ImportError:
     # 如果无法导入config，使用环境变量作为备选
-    API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-placeholder-key-not-set")
-    API_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1") + "/chat/completions"
+    API_KEY = os.getenv("API_KEY", "sk-placeholder-key-not-set")
+    API_URL = os.getenv("BASE_URL", "https://api.deepseek.com/v1") + "/chat/completions"
 
 # 设置日志
 logging.basicConfig(level=logging.INFO)
@@ -46,7 +46,7 @@ def query_knowledge(user_question):
     }
 
     body = {
-        "model": DEEPSEEK_MODEL,
+        "model": MODEL,
         "messages": [
             {"role": "user", "content": prompt}
         ],

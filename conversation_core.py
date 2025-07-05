@@ -1,6 +1,6 @@
 import logging,os,asyncio # 日志与系统
 from datetime import datetime # 时间
-from config import LOG_DIR, DEEPSEEK_API_KEY, DEEPSEEK_MODEL, TEMPERATURE, MAX_TOKENS, get_current_datetime, DEEPSEEK_BASE_URL, NAGA_SYSTEM_PROMPT, VOICE_ENABLED, GRAG_ENABLED # 配置
+from config import LOG_DIR, API_KEY, MODEL, TEMPERATURE, MAX_TOKENS, get_current_datetime, BASE_URL, NAGA_SYSTEM_PROMPT, VOICE_ENABLED, GRAG_ENABLED # 配置
 from mcpserver.mcp_manager import get_mcp_manager, remove_tools_filter, HandoffInputData # 多功能管理
 from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX # handoff提示词
 from mcpserver.agent_playwright_master import ControllerAgent, BrowserAgent, ContentAgent # 导入浏览器相关类
@@ -53,8 +53,8 @@ class NagaConversation: # 对话主类
         self.mcp = get_mcp_manager()
         self.messages = []
         self.dev_mode = False
-        self.client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL.rstrip('/') + '/')
-        self.async_client = AsyncOpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL.rstrip('/') + '/')
+        self.client = OpenAI(api_key=API_KEY, base_url=BASE_URL.rstrip('/') + '/')
+        self.async_client = AsyncOpenAI(api_key=API_KEY, base_url=BASE_URL.rstrip('/') + '/')
         
         # 初始化GRAG记忆系统（只在首次初始化时显示日志）
         self.memory_manager = memory_manager
@@ -111,7 +111,7 @@ class NagaConversation: # 对话主类
     async def _call_llm(self, messages: List[Dict]) -> Dict:
         """调用LLM API"""
         resp = await self.async_client.chat.completions.create(
-            model=DEEPSEEK_MODEL, 
+            model=MODEL, 
             messages=messages, 
             temperature=TEMPERATURE, 
             max_tokens=MAX_TOKENS, 
@@ -334,7 +334,7 @@ class NagaConversation: # 对话主类
         """为树状思考系统等提供API调用接口""" # 统一接口
         try:
             response = await self.async_client.chat.completions.create(
-                model=DEEPSEEK_MODEL,
+                model=MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=temperature,
                 max_tokens=MAX_TOKENS

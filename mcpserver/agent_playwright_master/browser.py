@@ -118,9 +118,9 @@ class ContentAgent:
             return f"ContentAgent处理失败: {str(e)}"
 
 load_dotenv()
-API_KEY = os.getenv("DEEPSEEK_API_KEY")
-BASE_URL = os.getenv("DEEPSEEK_BASE_URL")
-MODEL_NAME = os.getenv("DEEPSEEK_MODEL")
+API_KEY    = os.getenv("API_KEY")
+BASE_URL   = os.getenv("BASE_URL")
+MODEL_NAME = os.getenv("MODEL")
 
 ContentAgent = Agent(
     name="ContentAgent",
