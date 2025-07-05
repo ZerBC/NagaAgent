@@ -11,14 +11,12 @@ from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont, QPainter, QColor
 import sys
 import os
+import json
 
 # 添加项目根目录到path，以便导入配置
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__) + '/..'))
 
-try:
-    import config
-except ImportError:
-    print("警告：无法导入config模块")
+from config import config
 
 class SettingCard(QWidget):
     """单个设置卡片"""
@@ -232,7 +230,7 @@ class ElegantSettingsWidget(QWidget):
             "DeepSeek API Key", 
             "用于连接DeepSeek AI服务的密钥",
             api_key_input,
-            "DEEPSEEK_API_KEY"
+            "api.api_key"
         )
         api_key_card.value_changed.connect(self.on_setting_changed)
         group.add_card(api_key_card)
@@ -245,7 +243,7 @@ class ElegantSettingsWidget(QWidget):
             "API Base URL",
             "DeepSeek API的基础URL地址",
             base_url_input,
-            "DEEPSEEK_BASE_URL"
+            "api.base_url"
         )
         base_url_card.value_changed.connect(self.on_setting_changed)
         group.add_card(base_url_card)
@@ -253,13 +251,13 @@ class ElegantSettingsWidget(QWidget):
         
         # 模型选择
         model_combo = QComboBox()
-        model_combo.addItems(["deepseek-chat", "deepseek-coder", "gpt-4o-mini"])
+        model_combo.addItems(["deepseek-chat", "deepseek-coder", "gpt-4o-mini", "qwen3:32b", "qwen2.5-32b-instruct"])
         model_combo.setStyleSheet(self.get_combo_style())
         model_card = SettingCard(
             "AI 模型",
             "选择用于对话的AI模型",
             model_combo,
-            "DEEPSEEK_MODEL"
+            "api.model"
         )
         model_card.value_changed.connect(self.on_setting_changed)
         group.add_card(model_card)
@@ -280,7 +278,7 @@ class ElegantSettingsWidget(QWidget):
             "响应温度",
             "控制AI回复的随机性 (0.0-1.0)",
             temp_slider,
-            "TEMPERATURE"
+            "api.temperature"
         )
         temp_card.value_changed.connect(self.on_setting_changed)
         group.add_card(temp_card)
@@ -296,7 +294,7 @@ class ElegantSettingsWidget(QWidget):
             "最大Token数",
             "单次对话的最大长度限制",
             max_tokens_spin,
-            "MAX_TOKENS"
+            "api.max_tokens"
         )
         max_tokens_card.value_changed.connect(self.on_setting_changed)
         group.add_card(max_tokens_card)
@@ -312,7 +310,7 @@ class ElegantSettingsWidget(QWidget):
             "历史轮数",
             "保留的对话历史轮数",
             history_spin,
-            "MAX_HISTORY_ROUNDS"
+            "api.max_history_rounds"
         )
         history_card.value_changed.connect(self.on_setting_changed)
         group.add_card(history_card)
@@ -332,7 +330,7 @@ class ElegantSettingsWidget(QWidget):
             "流式响应",
             "启用实时流式响应显示",
             stream_checkbox,
-            "STREAM_MODE"
+            "system.stream_mode"
         )
         stream_card.value_changed.connect(self.on_setting_changed)
         group.add_card(stream_card)
@@ -340,13 +338,13 @@ class ElegantSettingsWidget(QWidget):
         
         # 语音功能
         voice_checkbox = QCheckBox()
-        voice_checkbox.setChecked(getattr(config, 'VOICE_ENABLED', False))
+        voice_checkbox.setChecked(config.system.voice_enabled)
         voice_checkbox.setStyleSheet(self.get_checkbox_style())
         voice_card = SettingCard(
             "语音交互",
             "启用语音输入和输出功能",
             voice_checkbox,
-            "VOICE_ENABLED"
+            "system.voice_enabled"
         )
         voice_card.value_changed.connect(self.on_setting_changed)
         group.add_card(voice_card)
@@ -361,7 +359,7 @@ class ElegantSettingsWidget(QWidget):
             "背景透明度",
             "调整界面背景的透明程度",
             alpha_slider,
-            "BG_ALPHA"
+            "ui.bg_alpha"
         )
         alpha_card.value_changed.connect(self.on_setting_changed)
         group.add_card(alpha_card)
@@ -381,7 +379,7 @@ class ElegantSettingsWidget(QWidget):
             "调试模式",
             "启用详细的调试信息输出",
             debug_checkbox,
-            "DEBUG"
+            "system.debug"
         )
         debug_card.value_changed.connect(self.on_setting_changed)
         group.add_card(debug_card)
@@ -396,7 +394,7 @@ class ElegantSettingsWidget(QWidget):
             "检索相似度",
             "记忆检索的相似度阈值",
             sim_slider,
-            "SIM_THRESHOLD"
+            "grag.similarity_threshold"
         )
         sim_card.value_changed.connect(self.on_setting_changed)
         group.add_card(sim_card)
@@ -586,32 +584,31 @@ class ElegantSettingsWidget(QWidget):
         """加载当前设置"""
         try:
             # API设置
-            self.api_key_input.setText(getattr(config, 'DEEPSEEK_API_KEY', ''))
-            self.base_url_input.setText(getattr(config, 'DEEPSEEK_BASE_URL', 'https://api.deepseek.com/v1'))
+            self.api_key_input.setText(config.api.api_key if config.api.api_key != "sk-placeholder-key-not-set" else "")
+            self.base_url_input.setText(config.api.base_url)
             
-            model = getattr(config, 'DEEPSEEK_MODEL', 'deepseek-chat')
-            index = self.model_combo.findText(model)
+            index = self.model_combo.findText(config.api.model)
             if index >= 0:
                 self.model_combo.setCurrentIndex(index)
                 
             # 系统设置
-            self.temp_slider.setValue(int(getattr(config, 'TEMPERATURE', 0.7) * 100))
-            self.max_tokens_spin.setValue(getattr(config, 'MAX_TOKENS', 2000))
-            self.history_spin.setValue(getattr(config, 'MAX_HISTORY_ROUNDS', 10))
+            self.temp_slider.setValue(int(config.api.temperature * 100))
+            self.max_tokens_spin.setValue(config.api.max_tokens)
+            self.history_spin.setValue(config.api.max_history_rounds)
             
             # 界面设置
-            self.stream_checkbox.setChecked(getattr(config, 'STREAM_MODE', True))
-            self.voice_checkbox.setChecked(getattr(config, 'VOICE_ENABLED', False))
+            self.stream_checkbox.setChecked(config.system.stream_mode)
+            self.voice_checkbox.setChecked(config.system.voice_enabled)
             
             # 高级设置
-            self.debug_checkbox.setChecked(getattr(config, 'DEBUG', False))
-            self.sim_slider.setValue(int(getattr(config, 'SIM_THRESHOLD', 0.3) * 100))
+            self.debug_checkbox.setChecked(config.system.debug)
+            self.sim_slider.setValue(int(config.grag.similarity_threshold * 100))
             
         except Exception as e:
             print(f"加载设置失败: {e}")
             
     def save_settings(self):
-        """保存所有设置"""
+        """保存所有设置到config.json"""
         try:
             changes_count = len(self.pending_changes)
             
@@ -619,57 +616,51 @@ class ElegantSettingsWidget(QWidget):
                 self.update_status_label("● 没有需要保存的更改")
                 return
             
-            # 实际保存逻辑
+            # 加载当前config.json
+            config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.json')
+            
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config_data = json.load(f)
+            except Exception:
+                config_data = {}
+            
             success_count = 0
             
-            # 保存到.env文件
-            env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
-            env_changes = {}
-            
-            # 保存到config.py文件  
-            config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.py')
-            
+            # 更新配置数据
             for setting_key, value in self.pending_changes.items():
                 try:
-                    if setting_key in ['DEEPSEEK_API_KEY', 'DEEPSEEK_BASE_URL', 'DEEPSEEK_MODEL']:
-                        # API相关设置保存到.env和config.py
-                        env_changes[setting_key] = str(value)
-                        success_count += 1
-                    elif setting_key == 'TEMPERATURE':
-                        # 温度值从0-100转换为0.0-1.0
-                        actual_value = value / 100.0
-                        self.update_config_value(config_path, setting_key, actual_value)
-                        success_count += 1
-                    elif setting_key == 'SIM_THRESHOLD':
-                        # 相似度从0-100转换为0.0-1.0
-                        actual_value = value / 100.0
-                        self.update_config_value(config_path, setting_key, actual_value)
-                        success_count += 1
-                    elif setting_key == 'BG_ALPHA':
-                        # 背景透明度从0-100转换为0.0-1.0
-                        actual_value = value / 100.0
-                        self.update_config_value(config_path, setting_key, actual_value)
-                        success_count += 1
+                    # 解析嵌套的配置键 (例如 "api.api_key")
+                    keys = setting_key.split('.')
+                    current = config_data
+                    
+                    # 导航到父级
+                    for key in keys[:-1]:
+                        if key not in current:
+                            current[key] = {}
+                        current = current[key]
+                    
+                    # 设置值
+                    final_key = keys[-1]
+                    if setting_key in ['api.temperature', 'grag.similarity_threshold', 'ui.bg_alpha']:
+                        # 温度、相似度、透明度值从0-100转换为0.0-1.0
+                        current[final_key] = value / 100.0
                     else:
-                        # 其他设置保存到config.py
-                        self.update_config_value(config_path, setting_key, value)
-                        success_count += 1
+                        current[final_key] = value
+                    
+                    success_count += 1
                         
                 except Exception as e:
                     print(f"保存设置 {setting_key} 失败: {e}")
             
-            # 批量更新.env文件
-            if env_changes:
-                self.update_env_file(env_path, env_changes)
+            # 保存到config.json
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(config_data, f, ensure_ascii=False, indent=2)
             
-            # 动态更新config模块
-            for setting_key, value in self.pending_changes.items():
-                if setting_key == 'TEMPERATURE':
-                    setattr(config, setting_key, value / 100.0)
-                elif setting_key in ['SIM_THRESHOLD', 'BG_ALPHA']:
-                    setattr(config, setting_key, value / 100.0)
-                else:
-                    setattr(config, setting_key, value)
+            # 动态更新config对象
+            from config import load_config
+            global config
+            config = load_config()
                     
             self.update_status_label(f"✓ 已保存 {success_count}/{changes_count} 项设置")
             self.pending_changes.clear()
@@ -680,47 +671,6 @@ class ElegantSettingsWidget(QWidget):
         except Exception as e:
             self.update_status_label(f"✗ 保存失败: {str(e)}")
             
-    def update_env_file(self, env_path, changes):
-        """更新.env文件"""
-        env_lines = []
-        
-        # 读取现有内容
-        if os.path.exists(env_path):
-            with open(env_path, 'r', encoding='utf-8') as f:
-                env_lines = f.readlines()
-        
-        # 更新或添加设置
-        for setting_key, value in changes.items():
-            found = False
-            for i, line in enumerate(env_lines):
-                if line.strip().startswith(f'{setting_key}='):
-                    env_lines[i] = f'{setting_key}={value}\n'
-                    found = True
-                    break
-            if not found:
-                env_lines.append(f'{setting_key}={value}\n')
-        
-        # 写回文件
-        with open(env_path, 'w', encoding='utf-8') as f:
-            f.writelines(env_lines)
-    
-    def update_config_value(self, config_path, setting_key, value):
-        """更新config.py文件中的值"""
-        with open(config_path, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-        
-        for i, line in enumerate(lines):
-            if line.strip().startswith(f'{setting_key} ='):
-                if isinstance(value, str):
-                    lines[i] = f"{setting_key} = '{value}'\n"
-                elif isinstance(value, bool):
-                    lines[i] = f"{setting_key} = {str(value)}\n"
-                else:
-                    lines[i] = f"{setting_key} = {value}\n"
-                break
-        
-        with open(config_path, 'w', encoding='utf-8') as f:
-            f.writelines(lines)
             
     def reset_settings(self):
         """重置所有设置"""

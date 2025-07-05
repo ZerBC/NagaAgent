@@ -9,7 +9,6 @@ import os
 import sys
 import platform
 import subprocess
-from pathlib import Path
 
 def print_status(message, status):
     """打印状态信息"""
@@ -159,7 +158,7 @@ def main():
     files = {
         "配置文件": "config.py",
         "主程序": "main.py", 
-        "依赖列表": "requirements.txt"
+        "依赖列表": "pyproject.toml"
     }
     
     # 系统特定文件
@@ -192,7 +191,7 @@ def main():
     # 检查 API 密钥配置
     try:
         import config
-        api_key = getattr(config, 'DEEPSEEK_API_KEY', '')
+        api_key = getattr(config, 'API_KEY', '')
         api_key_ok = api_key and api_key.strip() and api_key != " "
         print_status("DeepSeek API 密钥已配置", api_key_ok)
     except ImportError:
@@ -240,8 +239,8 @@ def main():
                 print("   运行: ./setup_mac.sh")
         
         if not api_key_ok:
-            print("   配置 API 密钥: 修改 config.py 中的 DEEPSEEK_API_KEY")
-            print("   或设置环境变量: export DEEPSEEK_API_KEY=your_key")
+            print("   配置 API 密钥: 修改 config.py 中的 API_KEY")
+            print("   或设置环境变量: export API_KEY=your_key")
     
     return 0 if all_good else 1
 

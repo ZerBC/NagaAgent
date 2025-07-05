@@ -5,7 +5,7 @@ from PyQt5.QtCore import Qt, QRect, QThread, pyqtSignal, QParallelAnimationGroup
 from PyQt5.QtGui import QColor, QPainter, QBrush, QFont, QPixmap, QPalette, QPen
 from conversation_core import NagaConversation
 import os
-import config # 导入全局配置
+from config import config # 导入统一配置
 from ui.response_utils import extract_message  # 新增：引入消息提取工具
 from ui.progress_widget import EnhancedProgressWidget  # 导入进度组件
 from ui.enhanced_worker import StreamingWorker, BatchWorker  # 导入增强Worker
@@ -14,13 +14,15 @@ import asyncio
 import json
 import websockets
 from PyQt5.QtCore import QObject, pyqtSignal as Signal
-BG_ALPHA=0.5 # 聊天背景透明度50%
-WINDOW_BG_ALPHA=110 # 主窗口背景透明度 (0-255，220约为86%不透明度)
-USER_NAME=os.getenv('COMPUTERNAME')or os.getenv('USERNAME')or'用户' # 自动识别电脑名
-MAC_BTN_SIZE=36 # mac圆按钮直径扩大1.5倍
-MAC_BTN_MARGIN=16 # 右侧边距
-MAC_BTN_GAP=12 # 按钮间距
-ANIMATION_DURATION = 600  # 动画时长统一配置，增加到600ms让动画更丝滑
+
+# 使用统一配置系统
+BG_ALPHA = config.ui.bg_alpha
+WINDOW_BG_ALPHA = config.ui.window_bg_alpha
+USER_NAME = config.ui.user_name
+MAC_BTN_SIZE = config.ui.mac_btn_size
+MAC_BTN_MARGIN = config.ui.mac_btn_margin
+MAC_BTN_GAP = config.ui.mac_btn_gap
+ANIMATION_DURATION = config.ui.animation_duration
 
 class TitleBar(QWidget):
     def __init__(s, text, parent=None):
@@ -467,7 +469,7 @@ class ChatWindow(QWidget):
         s.img.setMaximumSize(16777215,16777215)
         s.img.setStyleSheet('background:transparent; border: none;')
         stack.addWidget(s.img)
-        nick=QLabel(f"● 娜迦{config.NAGA_VERSION}",s.side)
+        nick=QLabel(f"● 娜迦{config.system.version}",s.side)
         nick.setStyleSheet("""
             QLabel {
                 color: #fff;

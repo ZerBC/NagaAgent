@@ -5,29 +5,26 @@ import base64
 import librosa
 from flask import Flask, request, send_file, jsonify
 from gevent.pywsgi import WSGIServer
-# from dotenv import load_dotenv  # 移除，使用主系统配置
 import os
 from flask_cors import CORS
 
 from handle_text import prepare_tts_input_with_context
 from tts_handler import generate_speech, get_models, get_voices
-from utils import getenv_bool, require_api_key, AUDIO_FORMAT_MIME_TYPES
-import config # 顶部引入
+from utils import require_api_key, AUDIO_FORMAT_MIME_TYPES
+from config import config # 统一配置系统
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
-# load_dotenv()  # 移除，使用主系统配置
 
-API_KEY = config.TTS_API_KEY # 统一配置
-PORT = config.TTS_PORT
-DEFAULT_VOICE = config.TTS_DEFAULT_VOICE
-DEFAULT_RESPONSE_FORMAT = config.TTS_DEFAULT_FORMAT
-DEFAULT_SPEED = config.TTS_DEFAULT_SPEED
+API_KEY = config.tts.api_key
+PORT = config.tts.port
+DEFAULT_VOICE = config.tts.default_voice
+DEFAULT_RESPONSE_FORMAT = config.tts.default_format
+DEFAULT_SPEED = config.tts.default_speed
 
-REMOVE_FILTER = getenv_bool('REMOVE_FILTER', False)
-EXPAND_API = getenv_bool('EXPAND_API', True)
+REMOVE_FILTER = config.tts.remove_filter
+EXPAND_API = config.tts.expand_api
 
-# DEFAULT_MODEL = nzos.getenv('DEFAULT_MODEL', 'tts-1')  # 默认模型（已注释）
 
 @app.route('/v1/audio/speech', methods=['POST'])
 @app.route('/audio/speech', methods=['POST'])  # 增加别名接口

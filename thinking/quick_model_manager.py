@@ -22,9 +22,9 @@ from config import (
     RESULT_SCORING_SYSTEM_PROMPT,
     THINKING_COMPLETENESS_SYSTEM_PROMPT,
     NEXT_QUESTION_SYSTEM_PROMPT,
-    DEEPSEEK_API_KEY, 
-    DEEPSEEK_BASE_URL, 
-    DEEPSEEK_MODEL
+    API_KEY, 
+    BASE_URL, 
+    MODEL
 )
 
 logger = logging.getLogger("QuickModelManager")
@@ -51,8 +51,8 @@ class QuickModelManager:
         
         # 备用大模型客户端
         self.fallback_client = AsyncOpenAI(
-            api_key=DEEPSEEK_API_KEY,
-            base_url=DEEPSEEK_BASE_URL.rstrip('/') + '/'
+            api_key=API_KEY,
+            base_url=BASE_URL.rstrip('/') + '/'
         )
         
         # 统计信息
@@ -464,23 +464,48 @@ class QuickModelManager:
         except asyncio.TimeoutError:
             logger.warning("快速模型调用超时")
             return None
+        except RuntimeError as e:
+            if "handler is closed" in str(e):
+                logger.debug(f"忽略连接关闭异常: {e}")
+                return None
+            else:
+                logger.warning(f"快速模型调用失败: {e}")
+                return None
         except Exception as e:
             logger.warning(f"快速模型调用失败: {e}")
             return None
     
     async def _call_fallback_model(self, prompt: str, system_prompt: str) -> str:
         """调用备用大模型"""
-        response = await self.fallback_client.chat.completions.create(
-            model=DEEPSEEK_MODEL,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.1,
-            max_tokens=1024
-        )
-        
-        return response.choices[0].message.content
+        try:
+            response = await self.fallback_client.chat.completions.create(
+                model=MODEL,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.1,
+                max_tokens=1024
+            )
+            
+            return response.choices[0].message.content
+        except RuntimeError as e:
+            if "handler is closed" in str(e):
+                logger.debug(f"忽略连接关闭异常，重新创建客户端: {e}")
+                # 重新创建客户端并重试
+                self.fallback_client = AsyncOpenAI(api_key=API_KEY, base_url=BASE_URL.rstrip('/') + '/')
+                response = await self.fallback_client.chat.completions.create(
+                    model=MODEL,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.1,
+                    max_tokens=1024
+                )
+                return response.choices[0].message.content
+            else:
+                raise
     
     def get_stats(self) -> Dict[str, Any]:
         """获取统计信息"""

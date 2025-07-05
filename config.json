@@ -1,0 +1,76 @@
+{
+  "system": {
+    "version": "3.0",
+    "voice_enabled": true,
+    "stream_mode": true,
+    "debug": true,
+    "log_level": "INFO"
+  },
+  "api": {
+    "api_key": "aaa",
+    "base_url": "http://localhost:11434/v1",
+    "model": "qwen3:32b",
+    "temperature": 0.7,
+    "max_tokens": 2048,
+    "max_history_rounds": 10,
+    "top_p": 0.95,
+    "timeout": 30,
+    "retry_count": 3
+  },
+  "api_server": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 8000,
+    "auto_start": true,
+    "docs_enabled": true
+  },
+  "grag": {
+    "enabled": true,
+    "auto_extract": true,
+    "context_length": 5,
+    "similarity_threshold": 0.6,
+    "neo4j_uri": "neo4j://127.0.0.1:7687",
+    "neo4j_user": "neo4j",
+    "neo4j_password": "password",
+    "neo4j_database": "neo4j"
+  },
+  "handoff": {
+    "max_loop_stream": 5,
+    "max_loop_non_stream": 5,
+    "show_output": false
+  },
+  "browser": {
+    "path": null,
+    "playwright_headless": false
+  },
+  "tts": {
+    "api_key": "your_tts_api_key_here",
+    "port": 5050,
+    "default_voice": "en-US-AvaNeural",
+    "default_format": "mp3",
+    "default_speed": 1.0,
+    "default_language": "en-US",
+    "remove_filter": false,
+    "expand_api": true,
+    "require_api_key": true
+  },
+  "quick_model": {
+    "enabled": true,
+    "api_key": "",
+    "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+    "model_name": "doubao-seed-1-6-flash-250615",
+    "max_tokens": 512,
+    "temperature": 0.05,
+    "timeout": 5,
+    "max_retries": 2
+  },
+  "ui": {
+    "user_name": "用户",
+    "bg_alpha": 0.5,
+    "window_bg_alpha": 110,
+    "mac_btn_size": 36,
+    "mac_btn_margin": 16,
+    "mac_btn_gap": 12,
+    "animation_duration": 600
+  }
+}

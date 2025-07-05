@@ -4,8 +4,7 @@ import asyncio
 import json
 import logging
 import re  # 添加re模块导入
-from typing import Dict, List, Any, Optional
-from datetime import datetime
+from typing import Dict, List
 import aiohttp
 from aiohttp import web
 import os
@@ -20,7 +19,7 @@ logger = logging.getLogger("AgentAPIServer")
 class AgentAPIServer:
     """代理API服务器"""
     
-    def __init__(self, config: Dict = None):
+    def __init__(self, config: Dict):
         self.config = config or {}
         self.api_key = self.config.get('api_key') or os.getenv('API_Key')
         self.api_url = self.config.get('api_url') or os.getenv('API_URL')
@@ -366,7 +365,7 @@ class AgentAPIServer:
             await runner.cleanup()
 
 # 便捷函数
-async def start_server(host: str = '127.0.0.1', port: int = 8000, config: Dict = None):
+async def start_server(host: str = '127.0.0.1', port: int = 8000, config: Dict = {}):
     """启动API服务器"""
     server = AgentAPIServer(config)
     await server.start(host, port)

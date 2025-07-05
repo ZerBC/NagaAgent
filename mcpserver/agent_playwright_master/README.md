@@ -117,9 +117,9 @@ await browser.subscribe_page_change(on_content_change, interval=2.0)  # 每2秒�
 ## 环境变量配置 #
 
 ```bash
-DEEPSEEK_API_KEY=your_api_key
-DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_MODEL=deepseek-chat
+API_KEY=your_api_key
+BASE_URL=https://api.deepseek.com
+MODEL=deepseek-chat
 ```
 
 ## 文件结构 #

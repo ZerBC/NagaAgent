@@ -7,14 +7,8 @@ import os
 # 添加项目根目录到路径，以便导入config
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-try:
-    from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
-    API_KEY = DEEPSEEK_API_KEY
-    API_URL = f"{DEEPSEEK_BASE_URL.rstrip('/')}/chat/completions"
-except ImportError:
-    # 如果无法导入config，使用环境变量作为备选
-    API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-placeholder-key-not-set")
-    API_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1") + "/chat/completions"
+from config import config
+API_URL = f"{config.api.base_url.rstrip('/')}/chat/completions"
 
 # 设置日志
 logging.basicConfig(level=logging.INFO)
@@ -41,18 +35,33 @@ def query_knowledge(user_question):
     )
 
     headers = {
-        "Authorization": f"Bearer {API_KEY}",
+        "Authorization": f"Bearer {config.api.api_key}",
         "Content-Type": "application/json"
     }
 
+    # 检测是否使用ollama并启用结构化输出
+    is_ollama = "localhost" in config.api.base_url or "11434" in config.api.base_url
+    
     body = {
-        "model": DEEPSEEK_MODEL,
+        "model": config.api.model,
         "messages": [
             {"role": "user", "content": prompt}
         ],
         "max_tokens": 150,
         "temperature": 0.5  # 降低温度，提高精准度
     }
+    
+    # 为ollama添加结构化输出
+    if is_ollama:
+        body["format"] = "json"
+        # 简化提示词，ollama会自动处理JSON格式
+        simplified_prompt = (
+            f"基于以下上下文和用户问题，提取与知识图谱相关的关键词（如实体、关系），"
+            f"仅返回核心关键词，避免无关词。直接返回关键词数组：\n"
+            f"上下文：\n{context_str}\n"
+            f"问题：{user_question}"
+        )
+        body["messages"] = [{"role": "user", "content": simplified_prompt}]
 
     try:
         response = requests.post(API_URL, headers=headers, json=body, timeout=10)
@@ -73,7 +82,7 @@ def query_knowledge(user_question):
                 raise ValueError("关键词应为列表")
         except (json.JSONDecodeError, ValueError) as e:
             logger.error(f"解析 DeepSeek 响应失败: {raw_content}, 错误: {e}")
-            return f"无法解析关键词，请检查问题格式。"
+            return "无法解析关键词，请检查问题格式。"
 
         if not keywords:
             logger.warning("未提取到关键词")

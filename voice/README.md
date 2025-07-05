@@ -29,7 +29,7 @@
 ### 前置条件
 
 - **Docker**（推荐）：建议用 Docker 和 Docker Compose 部署。
-- **Python**（可选）：本地开发可用，需安装 `requirements.txt`。
+- **Python**（可选）：本地开发可用，需安装 `pyproject.toml` 中的依赖。
 - **ffmpeg**（可选）：音频格式转换需要。只用mp3可不装。
 
 ### 安装步骤
@@ -91,7 +91,7 @@ venv\Scripts\activate
 用 `pip` 安装依赖：
 
 ```bash
-pip install -r requirements.txt
+uv sync --extra audio  # 或 pip install -e .
 ```
 
 ### 4. 配置环境变量

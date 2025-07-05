@@ -1,9 +1,7 @@
 from typing import Any, Dict, Callable
-from config import *  # 配置参数统一管理 #
+from config import config  # 配置参数统一管理 #
 import asyncio
 import html2text  # 用于HTML转Markdown #
-import os
-from dotenv import load_dotenv
 from agents import Agent, AgentHooks, RunContextWrapper
 
 AD_SELECTORS = [
@@ -117,15 +115,12 @@ class ContentAgent:
         except Exception as e:
             return f"ContentAgent处理失败: {str(e)}"
 
-load_dotenv()
-API_KEY = os.getenv("DEEPSEEK_API_KEY")
-BASE_URL = os.getenv("DEEPSEEK_BASE_URL")
-MODEL_NAME = os.getenv("DEEPSEEK_MODEL")
+# 使用统一配置系统
 
 ContentAgent = Agent(
     name="ContentAgent",
     instructions="你负责对网页内容进行清洗、摘要、翻译等处理。",
     tools=[PlaywrightBrowser],
     hooks=ContentAgentHooks(),
-    model=MODEL_NAME
+    model=config.api.model
 ) 

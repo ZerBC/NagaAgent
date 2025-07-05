@@ -227,11 +227,11 @@ async def process(self, u, is_voice_input=False):
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": u}
     ]
-    processed_messages = await preprocess_messages(messages, model=DEEPSEEK_MODEL)
+    processed_messages = await preprocess_messages(messages, model=MODEL)
     
     # 使用预处理后的消息调用LLM
     resp = await self.async_client.chat.completions.create(
-        model=DEEPSEEK_MODEL, 
+        model=MODEL, 
         messages=processed_messages,
         temperature=TEMPERATURE, 
         max_tokens=MAX_TOKENS, 

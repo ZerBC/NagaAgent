@@ -8,14 +8,9 @@ import os
 # 添加项目根目录到路径，以便导入config
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-try:
-    from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
-    API_KEY = DEEPSEEK_API_KEY
-    API_URL = f"{DEEPSEEK_BASE_URL.rstrip('/')}/chat/completions"
-except ImportError:
-    # 如果无法导入config，使用环境变量作为备选
-    API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-placeholder-key-not-set")
-    API_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1") + "/chat/completions"
+from config import config
+API_KEY = config.api.api_key
+API_URL = f"{config.api.base_url.rstrip('/')}/chat/completions"
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -36,7 +31,7 @@ def extract_triples(text):
     }
 
     body = {
-        "model": DEEPSEEK_MODEL,
+        "model": config.api.model,
         "messages": [
             {"role": "user", "content": prompt}
         ],
