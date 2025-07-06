@@ -62,6 +62,7 @@ dependencies = [
     # 注意：PyQt5现在使用系统版本，通过软链接解决版本兼容性问题
     # 如果系统没有PyQt5，需要先安装：sudo pacman -S python-pyqt5
     "pyqt5>=5.15.11",
+    "pyqt5-qt5==5.15.2",
     "playwright>=1.52.0",
     "greenlet>=3.2.1",
     "pyee>=13.0.0",
